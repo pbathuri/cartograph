@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 # PyPI distribution name (the import module stays `cartograph` and the CLI stays `carto`).
 name = "cartograph__v1"
-version = "0.4.0"
+version = "0.5.0"
 description = "Build a personal cognitive graph of everything you work with, and plug it into your AI agents."
 readme = "README.md"
 license = { text = "MIT" }
@@ -33,8 +33,11 @@ dependencies = [
 semantic = ["sentence-transformers>=2.6", "numpy>=1.24", "einops>=0.7"]
 # Graph ML: train your own link-prediction / recommendation models on YOUR graph.
 ml = ["torch>=2.0", "scikit-learn>=1.3", "numpy>=1.24"]
+# Real-time vision: screen capture + OCR feeding the graph (also needs the Tesseract binary on PATH).
+vision = ["mss>=9.0", "pillow>=10.0", "pytesseract>=0.3.10"]
 # Everything.
-full = ["sentence-transformers>=2.6", "torch>=2.0", "scikit-learn>=1.3", "numpy>=1.24", "einops>=0.7"]
+full = ["sentence-transformers>=2.6", "torch>=2.0", "scikit-learn>=1.3", "numpy>=1.24", "einops>=0.7",
+        "mss>=9.0", "pillow>=10.0", "pytesseract>=0.3.10"]
 dev = ["pytest>=7"]
 
 [project.scripts]

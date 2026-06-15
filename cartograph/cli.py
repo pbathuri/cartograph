@@ -247,6 +247,62 @@ def route(prompt: str = typer.Argument(..., help="A prompt to route to its field
 
 
 @app.command()
+def watch(interval: float = typer.Option(60.0, "--interval", help="Seconds between captures."),
+          minutes: float = typer.Option(0.0, "--minutes", help="Stop after N minutes (0 = run until Ctrl-C)."),
+          apply: bool = typer.Option(False, "--apply", help="Actually store + learn. Default is a DRY RUN."),
+          no_redact: bool = typer.Option(False, "--no-redact", help="(not recommended) skip secret redaction")) -> None:
+    """Real-time vision: periodically screenshot -> novelty-cache -> OCR -> redact -> classify -> graph.
+
+    PRIVACY: local-only; sensitive windows (banking/passwords/auth) are skipped; secrets are redacted
+    before anything is stored. Default is a DRY RUN (nothing is saved) so you can see exactly what would
+    be captured. Add --apply to enable. Touch ~/.cartograph/vision.paused to pause; remove it to resume.
+    """
+    from .vision.capture import default_capturer
+    from .vision.ocr import default_ocr
+    from .vision.pipeline import VisionConfig
+    from .vision.watch import watch as _watch
+
+    cap, ocr = default_capturer(), default_ocr()
+    if cap is None or ocr is None:
+        missing = []
+        if cap is None:
+            missing.append("screen capture (mss + Pillow)")
+        if ocr is None:
+            missing.append("OCR (pytesseract + the Tesseract binary)")
+        console.print("[red]Vision needs extra dependencies:[/red] " + ", ".join(missing))
+        console.print("Install with [bold]pip install 'cartograph__v1\\[vision]'[/bold] "
+                      "(and the Tesseract engine for OCR), then re-run.")
+        raise typer.Exit(1)
+
+    vcfg = VisionConfig(interval_sec=interval, redact=not no_redact)
+    persona = None
+    if apply:
+        from .persona.profile import load_persona
+        persona = load_persona(_store(read_only=True))
+    iters = int(minutes * 60 / interval) if minutes > 0 else None
+    mode = "[green]APPLY[/green] (storing + learning)" if apply else "[yellow]DRY RUN[/yellow] (nothing saved)"
+    console.print(f"[bold]carto watch[/bold] — {mode}, every {interval:g}s. "
+                  + (f"stopping after {minutes:g} min." if iters else "Ctrl-C to stop."))
+    console.print("[dim]Sensitive windows are skipped; secrets redacted before storage.[/dim]\n")
+
+    def show(rec: dict) -> None:
+        if rec["action"] in ("store", "preview"):
+            r = (f"  redacted {rec['redacted']}" if rec.get("redacted") else "")
+            console.print(f"[green]●[/green] {rec['action']:7s} field=[cyan]{rec['field']}[/cyan] "
+                          f"intent={rec['intent']} chars={rec['chars']}{r}  [dim]{rec.get('app','')[:40]}[/dim]")
+        else:
+            console.print(f"[dim]· skip ({rec['reason']}) {rec.get('app','')[:40]}[/dim]")
+    try:
+        summary = _watch(_store(), load_config(), vcfg, cap, ocr, iterations=iters,
+                         apply=apply, persona=persona, on_record=show)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]stopped.[/yellow]")
+        return
+    console.print(f"\n[bold]done[/bold] — {summary['ticks']} ticks: "
+                  + ", ".join(f"{k}×{v}" for k, v in summary["counts"].items()))
+
+
+@app.command()
 def persona(rebuild: bool = typer.Option(False, "--rebuild", help="Re-derive field weights from the corpus."),
             json_out: bool = typer.Option(False, "--json")) -> None:
     """Show (or rebuild) your learned persona: field weights, preferences, confidence."""

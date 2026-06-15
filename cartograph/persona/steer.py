@@ -124,6 +124,20 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
     guidance.append("Output style: " + "; ".join(f"{k}={v}" for k, v in prefs.items()) + ".")
     if pr["chunks"]:
         guidance.append("Prefer the user's own patterns over generic ones; cite the files below.")
+    # Live screen context (if the vision watcher is running): what the user is doing RIGHT NOW. This is
+    # the honest "optimize before the output" mechanism — it enriches the INJECTED context, not the model.
+    activity = []
+    try:
+        from ..vision.pipeline import recent_activity
+        activity = recent_activity(store, limit=3)
+    except Exception:
+        activity = []
+    if activity:
+        cur = activity[0]
+        where = cur.get("app") or "their screen"
+        guidance.append(f"Live context: the user is currently working in {where}"
+                        + (f" on a '{cur['field']}' task" if cur.get("field") else "")
+                        + " — make the answer continuous with what's on screen.")
     # assemble context, optionally trimmed to a char budget (drop trailing snippets to fit)
     ctx, used, per = [], 0, 400
     if max_chars and pr["chunks"]:
@@ -144,6 +158,7 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
         "preferences": prefs,
         "steer_confidence": pr.get("steer_confidence", 0.0),
         "relevant_context": ctx,
+        "current_activity": activity,
         "output_guidance": guidance,
         "note": "Prepend this to the model's context. Field-weight steering works with zero ML; the "
                 "preference vector sharpens it once `carto index` is built and feedback accrues.",

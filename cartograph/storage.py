@@ -86,6 +86,30 @@ class Store:
                             (project_id, path, ext, hash_))
             return cur.lastrowid
 
+    def ensure_file(self, project_id: int, path: str, ext: str = "screen") -> int:
+        """Get-or-create a file row WITHOUT touching its chunks (unlike upsert_file, which replaces on
+        hash change). Used by the vision pipeline to append screen-activity chunks to a daily 'file'."""
+        with self.cursor() as c:
+            row = c.execute("SELECT id FROM files WHERE project_id=? AND path=?", (project_id, path)).fetchone()
+            if row:
+                return row["id"]
+            cur = c.execute("INSERT INTO files(project_id, path, ext, hash) VALUES(?,?,?,?)",
+                            (project_id, path, ext, "live"))
+            return cur.lastrowid
+
+    def recent_chunks(self, project_id: int, limit: int = 5) -> list[dict]:
+        """Most-recently-inserted chunks for a project (highest chunk id = newest). For live context."""
+        with self.cursor() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT ch.id AS chunk_id, ch.chunk_text, f.path AS file_path FROM chunks ch "
+                "JOIN files f ON f.id = ch.file_id WHERE f.project_id=? ORDER BY ch.id DESC LIMIT ?",
+                (project_id, limit)).fetchall()]
+
+    def project_id_by_name(self, name: str) -> int | None:
+        with self.cursor() as c:
+            row = c.execute("SELECT id FROM projects WHERE name=?", (name,)).fetchone()
+            return row["id"] if row else None
+
     def add_chunks(self, file_id: int, texts: list[str]) -> int:
         with self.cursor() as c:
             c.executemany("INSERT INTO chunks(file_id, chunk_text, ordinal) VALUES(?,?,?)",

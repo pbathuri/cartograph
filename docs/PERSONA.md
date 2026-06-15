@@ -116,10 +116,34 @@ trained on your own data** — no fixed heuristics where learning is possible:
 So the layer is **agnostic on three axes** — field (router), use-case (intent), and your revealed
 preferences (subspaces + reranker) — and each axis is learned from *you*.
 
+### The real-time vision layer (`carto watch`) — one core builder of data
+The graph stops being a one-time ingest and becomes a **living stream**. A background loop periodically
+screenshots, and a deliberately **light "model in between"** — a perceptual-hash + text-similarity
+**novelty gate (a similarity cache)** — decides whether the frame is worth processing. Genuinely-new
+screens are OCR'd, **redacted**, classified with the *same* router + intent models, and ingested as
+graph chunks. Because they land in the same store, that stream flows into retrieval, the persona (field
+weights gently drift toward what you actually do), and the steering brief — automatically. It's the
+"one core builder of data": the graph grows from your real activity as time goes forward.
+
+Why a cheap gate and not a heavy CV model? A background CPU loop's value is the **OCR text + dedup**, not
+pixels. A CNN per tick would burn compute for almost no marginal signal; the reasoned choice is the
+near-free gate that skips ~all redundant frames and routes the rest into the models we already trained.
+
+**Privacy is the design, not a footnote:** local-only; **dry-run by default** (nothing stored until
+`--apply`); **sensitive windows** (banking / password managers / auth) are never even OCR'd; **secrets
+and PII are redacted** before anything is written; a `vision.paused` file is a one-touch kill-switch.
+
+**Honest boundary on "optimize the output before the user sees it":** there is **no hook into a closed
+model's (ChatGPT/Gemini) generation**. What's real is that the live screen context now rides in the
+steering brief (`current_activity`), so the *injected context* reflects what you're doing right now —
+the same model-agnostic mechanism as the rest of the persona layer, applied to a live signal.
+
 **Natural next steps (not yet built):**
 - **Cross-tool event stream** — a tiny local daemon that all surfaces write to, for true real-time sync.
 - **Contextual α / per-field reranker** — separate learned weights per field/prompt-type.
 - **Held-out reranker eval** — time-split the feedback log to report true generalization, not just fit.
+- **Vision → session segmentation** — cluster the activity stream into tasks/sessions and summarize them
+  into higher-order graph nodes (so "what was I doing yesterday" becomes a first-class query).
 
 These are deliberately staged: the current version is simple, inspectable, and useful on day one;
 the roadmap adds power without giving up that transparency.
