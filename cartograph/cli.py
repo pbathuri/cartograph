@@ -219,6 +219,19 @@ def train() -> None:
         console.print("[green]✓ router trained[/green] on " + ", ".join(f"{k}({v})" for k, v in counts.items()))
     else:
         console.print("[yellow]no field-labeled chunks[/yellow] for the router — run carto ingest (declare --field).")
+    # R4: learned/clustered fields — relabel projects the keyword inference left as 'general' (non-dev
+    # corpora) with emergent clusters, so field weights + subspaces work for any vocabulary.
+    from .learned_fields import learn_fields
+    from .persona.profile import build_from_corpus, load_persona as _lp, save_persona as _sp
+    lf = learn_fields(_store(), load_config())
+    if lf.get("learned"):
+        console.print(f"[green]✓ learned fields[/green]: {lf['clusters']} clusters over {lf['projects']} "
+                      f"unfielded projects → {sorted(set(lf['fields'].values()))}")
+        old = _lp(_store(read_only=True)); fresh = build_from_corpus(_store(read_only=True))
+        old.field_weights = fresh.field_weights                # refresh weights for the learned fields...
+        for k, v in fresh.confidence.items():
+            old.confidence.setdefault(k, v)
+        _sp(old)                                               # ...while keeping learned_alpha/prefs/signals
     # contextual affinity: cluster the feedback queries so preference is per query-context (must be built
     # BEFORE the reranker, which consumes it as a feature). Quietly skips without enough feedback.
     from .context_affinity import build_contexts
@@ -238,6 +251,24 @@ def train() -> None:
     else:
         console.print(f"[dim]reranker: {rep.get('reason')} — give feedback (carto feedback / MCP record_use), "
                       f"then re-run carto train[/dim]")
+
+
+@app.command()
+def fields(json_out: bool = typer.Option(False, "--json")) -> None:
+    """Learn emergent fields by clustering your corpus and relabel projects left as 'general' (helps
+    non-dev users whose vocabulary doesn't match the built-in field keywords). Needs the semantic index."""
+    from .learned_fields import learn_fields
+    rep = learn_fields(_store(), load_config())
+    if json_out:
+        typer.echo(json.dumps(rep, indent=2))
+        return
+    if rep.get("learned"):
+        console.print(f"[green]✓ learned {rep['clusters']} fields[/green] over {rep['projects']} projects:")
+        for proj, fld in sorted(rep["fields"].items()):
+            console.print(f"  {proj:28s} → [cyan]{fld}[/cyan]")
+        console.print("[dim]run `carto persona --rebuild` to refresh field weights.[/dim]")
+    else:
+        console.print(f"[yellow]not learned[/yellow]: {rep.get('reason')}")
 
 
 @app.command()
