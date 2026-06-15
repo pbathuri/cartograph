@@ -143,6 +143,10 @@ Hilbert-space mapping, and honest limits: **[docs/PERSONA.md](docs/PERSONA.md)**
 
 Cartograph speaks **MCP** (Model Context Protocol). Add it once and your agent can query your graph.
 
+**One-step wiring:** run **`carto agent-setup`** — it prints the exact MCP config *and* the system-prompt
+rule that makes your agent call Cartograph automatically on every task (`personalize` → `retrieve_context`
+→ `record_use`). Paste them in and you're done.
+
 **Claude Code / Cursor** — add to your MCP config (`~/.cursor/mcp.json` or Claude Code's MCP settings):
 ```json
 {
@@ -238,7 +242,7 @@ Field inference lives in `cartograph/ingest.py`.
 
 ## 🗂️ Commands
 
-`carto demo · init · ingest · index · retrieve · elevate · frontier · review · persona · personalize ·
+`carto demo · agent-setup · init · ingest · index · retrieve · elevate · frontier · review · persona · personalize ·
 feedback · prefs · serve · stats · viz · mcp-server · doctor` (run `carto --help` or `carto <cmd> --help`).
 
 ## License

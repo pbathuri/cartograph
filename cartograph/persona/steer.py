@@ -84,8 +84,10 @@ _DEFAULT_GUIDANCE = {
 }
 
 
-def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile, *, top_k: int = 6) -> dict:
-    """The model-agnostic personalization envelope an agent prepends before answering."""
+def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile, *, top_k: int = 6,
+                max_chars: int = 0) -> dict:
+    """The model-agnostic personalization envelope an agent prepends before answering.
+    `max_chars` (0 = unlimited) caps total snippet text so the brief fits a context budget."""
     pfield = match_field(prompt) or "general"
     pr = personalized_retrieve(prompt, store, cfg, persona, top_k=top_k)
     prefs = {**_DEFAULT_GUIDANCE, **persona.preferences}
@@ -102,6 +104,16 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
     guidance.append("Output style: " + "; ".join(f"{k}={v}" for k, v in prefs.items()) + ".")
     if pr["chunks"]:
         guidance.append("Prefer the user's own patterns over generic ones; cite the files below.")
+    # assemble context, optionally trimmed to a char budget (drop trailing snippets to fit)
+    ctx, used, per = [], 0, 400
+    if max_chars and pr["chunks"]:
+        per = max(160, min(400, max_chars // max(1, len(pr["chunks"]))))
+    for c in pr["chunks"]:
+        snip = (c.get("chunk_text") or "")[:per]
+        if max_chars and used + len(snip) > max_chars and ctx:
+            break
+        ctx.append({"project": c.get("project_name"), "file": c.get("file_path"), "snippet": snip})
+        used += len(snip)
     return {
         "prompt": prompt,
         "prompt_field": pfield,
@@ -109,8 +121,7 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
         "top_fields": persona.top_fields(4),
         "preferences": prefs,
         "steer_confidence": pr.get("steer_confidence", 0.0),
-        "relevant_context": [{"project": c.get("project_name"), "file": c.get("file_path"),
-                              "snippet": (c.get("chunk_text") or "")[:400]} for c in pr["chunks"]],
+        "relevant_context": ctx,
         "output_guidance": guidance,
         "note": "Prepend this to the model's context. Field-weight steering works with zero ML; the "
                 "preference vector sharpens it once `carto index` is built and feedback accrues.",

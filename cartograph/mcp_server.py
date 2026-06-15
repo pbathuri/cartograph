@@ -35,7 +35,7 @@ TOOLS = [
                     "(the user's persona/field focus, output guidance, and persona-ranked relevant "
                     "snippets) to prepend so your answer fits this specific user and their work. Adapts "
                     "as feedback accrues.",
-     "params": {"prompt": "string", "top_k": "int? (default 6)"}},
+     "params": {"prompt": "string", "top_k": "int? (default 6)", "max_chars": "int? context budget (0=unlimited)"}},
     {"name": "record_use",
      "description": "Close the learning loop: after answering, report which projects actually helped "
                     "(and which didn't) so the persona adapts to what the user responds to. Call when you "
@@ -108,7 +108,8 @@ def _dispatch(rid: Any, name: str, args: dict) -> str:
             if not prompt:
                 return _resp(rid, error="prompt is required")
             return _resp(rid, build_brief(prompt, store, cfg, load_persona(store),
-                                          top_k=int(args.get("top_k", 6))))
+                                          top_k=int(args.get("top_k", 6)),
+                                          max_chars=int(args.get("max_chars", 0))))
         if name == "record_use":
             from .persona import record_feedback
             from .persona.profile import load_persona

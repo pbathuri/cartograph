@@ -222,12 +222,13 @@ def persona(rebuild: bool = typer.Option(False, "--rebuild", help="Re-derive fie
 
 @app.command()
 def personalize(prompt: str = typer.Argument(..., help="The prompt your agent is about to answer."),
+                budget: int = typer.Option(0, "--budget", help="Max chars of snippet context (0 = unlimited)."),
                 json_out: bool = typer.Option(False, "--json")) -> None:
     """Emit the steering brief for a prompt — the personalization envelope an agent prepends."""
     from .persona import build_brief
     from .persona.profile import load_persona
     store = _store(read_only=True)
-    brief = build_brief(prompt, store, load_config(), load_persona(store))
+    brief = build_brief(prompt, store, load_config(), load_persona(store), max_chars=budget)
     if json_out:
         typer.echo(json.dumps(brief, indent=2))
         return
@@ -310,6 +311,32 @@ def serve(port: int = typer.Option(8787, "--port")) -> None:
     from .viz.app import launch
     console.print(f"Cartograph API on http://127.0.0.1:{port}  — GET /api/personalize?prompt=...")
     launch(port=port, open_browser=False)
+
+
+_AGENT_RULE = (
+    "At the START of every task, call the Cartograph MCP tool `personalize` with the user's request; "
+    "follow its `output_guidance` and prefer the user's own patterns in `relevant_context`. For grounding "
+    "in their code/docs, call `retrieve_context`. For a frontier-grade plan, call `elevate_task`. After "
+    "you answer using Cartograph context, call `record_use` with the projects that helped — so it adapts."
+)
+
+
+@app.command("agent-setup")
+def agent_setup(rules_file: bool = typer.Option(False, "--write-rules",
+                help="Also write the agent rule to .cartograph_agent_rules.md in the cwd.")) -> None:
+    """Print the exact MCP config + the system-prompt rule that makes any agent use Cartograph on every
+    prompt. Paste the JSON into your MCP client and the rule into your agent's system prompt / rules."""
+    cfg_json = json.dumps({"mcpServers": {"cartograph": {
+        "command": "carto", "args": ["mcp-server"], "type": "stdio"}}}, indent=2)
+    console.print("[bold]1) MCP config[/bold] — add to ~/.cursor/mcp.json (Cursor) or your Claude Code MCP settings:")
+    console.print(cfg_json)
+    console.print("\n[bold]2) System-prompt / rules[/bold] — paste into your agent's rules so it auto-uses Cartograph:")
+    console.print(f"[dim]{_AGENT_RULE}[/dim]")
+    console.print("\n[bold]3) Web GenAI[/bold] (ChatGPT/Gemini): run [bold]carto serve[/bold] + the userscript in docs/BROWSER.md.")
+    if rules_file:
+        out = Path(".cartograph_agent_rules.md")
+        out.write_text(f"# Cartograph agent rule\n\n{_AGENT_RULE}\n", encoding="utf-8")
+        console.print(f"\n[green]✓ wrote[/green] {out.resolve()}")
 
 
 @app.command()
