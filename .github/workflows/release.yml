@@ -29,3 +29,5 @@ jobs:
           python -m twine check dist/*
       - name: Publish to PyPI (Trusted Publishing)
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true     # idempotent: re-running a tag never fails on an already-published version
