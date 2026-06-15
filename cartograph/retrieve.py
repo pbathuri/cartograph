@@ -82,8 +82,19 @@ def retrieve(query: str, store: Store, cfg: Config, *, top_k: int = 10) -> Retri
     sem_rows = _chunks_by_id(store, sem_ids)
     pool = {r["chunk_id"]: r for r in fts_rows}
     pool.update(sem_rows)
-    fused = rrf_fuse([sem_ids, [r["chunk_id"] for r in fts_rows]], top_k)
-    chunks = [pool[i] for i in fused if i in pool]
+    # fused RRF scores (kept, not just the order) so downstream can measure relevance MARGIN/ambiguity.
+    fscore: dict[Any, float] = {}
+    for ranking in (sem_ids, [r["chunk_id"] for r in fts_rows]):
+        for rank, key in enumerate(ranking, 1):
+            if key is not None:
+                fscore[key] = fscore.get(key, 0.0) + 1.0 / (60 + rank)
+    fused = [k for k, _ in sorted(fscore.items(), key=lambda t: t[1], reverse=True)][:top_k]
+    chunks = []
+    for i in fused:
+        if i in pool:
+            ch = dict(pool[i])
+            ch["score"] = round(fscore.get(i, 0.0), 6)       # fused relevance score
+            chunks.append(ch)
     method = "hybrid" if sem_ids else "fts"
     projects: list[str] = []
     for ch in chunks:

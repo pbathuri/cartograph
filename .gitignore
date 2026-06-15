@@ -23,6 +23,9 @@ venv/
 .pytest_cache/
 .mypy_cache/
 
+# V1 end-to-end simulation workspace (synthetic data + eval artifacts; never shipped)
+test_v1/
+
 # OS / editor
 .DS_Store
 Thumbs.db

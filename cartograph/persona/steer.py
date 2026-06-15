@@ -38,7 +38,7 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     # confidence in steering grows with how much we know about the user
     steer_conf = min(1.0, persona.n_signals / 20.0) if persona.n_signals else (0.3 if persona.field_weights else 0.0)
     base_alpha = alpha if alpha is not None else getattr(persona, "learned_alpha", 0.35)
-    a = base_alpha * (0.4 + 0.6 * steer_conf)
+    a = base_alpha * (0.4 + 0.6 * steer_conf)               # don't steer hard before we know the user
     vecs = persona._load_all()                              # per-field subspace vectors + _global
     from ..rerank_model import extract_features, load as load_reranker, project_affinities
     from ..router import route
@@ -59,10 +59,22 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
             if cv is not None:
                 import numpy as np
                 pc = float(max(0.0, np.dot(pv, cv)))
-        if reranker is not None:                            # LEARNED reranker decides the score
+        if reranker is not None:                            # LEARNED reranker, RELEVANCE-GATED
             feat = extract_features(base, fw, pc, 1.0 if fld == rfield else 0.0,
                                     aff.get(_na(ch.get("project_name")), 0.0))
-            score = float(reranker.proba([feat])[0])
+            rr = float(reranker.proba([feat])[0])
+            # The reranker learns the user's project preference from reward, but a query-INDEPENDENT
+            # affinity must never lift a low-relevance distractor over a top-relevance hit (measured: it
+            # regressed clear queries 1.0 -> 0.44 in the test_v1 trial). RELEVANCE GATE: full influence
+            # near the top (where a preferred-but-#2 project lives), zero past rank ~3 -- it can re-order
+            # the relevant head, never pollute the tail. (Within-domain, query-CONTEXTUAL affinity is the
+            # next-gen fix; global affinity is intentionally kept conservative here so it does no harm.)
+            relgate = max(0.0, 1.0 - i / 3.0)
+            delta = rr - 0.5
+            if i == 0 and delta < 0:
+                delta = 0.0          # never demote the single most-relevant hit on global affinity alone
+                                     # (a project disliked for one query is still correct for its own)
+            score = base + a * delta * relgate
         else:                                               # heuristic blend (hand-tuned, learned-alpha)
             ps = 0.5 * fw + 0.5 * pc if pv is not None else fw
             score = (1 - a) * base + a * ps
