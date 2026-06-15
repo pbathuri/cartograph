@@ -16,8 +16,11 @@ def _persona_path() -> Path:
     return home() / "persona.json"
 
 
-def _vec_path() -> Path:
-    return home() / "persona_vec.npy"
+def _vecs_path() -> Path:
+    # one preference vector PER field (the "many subspaces") + a "_global" fallback, in one npz.
+    return home() / "persona_vecs.npz"
+
+_GLOBAL = "_global"
 
 
 @dataclass
@@ -35,6 +38,11 @@ class PersonaProfile:
     def top_fields(self, k: int = 5) -> list[tuple[str, float]]:
         return sorted(self.field_weights.items(), key=lambda t: -t[1])[:k]
 
+    def decay(self, factor: float = 0.98) -> None:
+        """Recency: gently shrink existing field emphasis so newer signals weigh more ('right now')."""
+        if 0 < factor < 1 and self.field_weights:
+            self.field_weights = {k: v * factor for k, v in self.field_weights.items()}
+
     def bump_field(self, fld: str, amount: float = 0.15) -> None:
         """Nudge a field's emphasis up (engaged) or down (negative amount); clamp >=0, renormalize."""
         if not fld or fld == "general":
@@ -47,18 +55,37 @@ class PersonaProfile:
         if tot > 0:
             self.field_weights = {k: round(v / tot, 4) for k, v in self.field_weights.items()}
 
-    # ---- preference vector (optional, embedding space) ----
-    def load_vector(self):
-        if not (self.has_pref_vector and _vec_path().exists()):
-            return None
+    # ---- preference vectors: one per field (subspaces) + a global fallback (embedding space) ----
+    def _load_all(self) -> dict:
+        if not _vecs_path().exists():
+            return {}
         try:
             import numpy as np
-            return np.load(_vec_path())
+            with np.load(_vecs_path()) as z:
+                return {k: z[k] for k in z.files}
         except Exception:
-            return None
+            return {}
 
-    def update_vector(self, new_vecs, lr: float = 0.2, away: bool = False) -> None:
-        """EMA the preference centroid toward (or, if away=True, away from) engaged-item embeddings."""
+    def _save_all(self, d: dict) -> None:
+        try:
+            import numpy as np
+            np.savez(_vecs_path(), **d)
+            self.has_pref_vector = bool(d)
+            self.pref_fields = sorted(k for k in d if k != _GLOBAL)
+        except Exception:
+            pass
+
+    def load_vector(self, field: str | None = None):
+        """The preference vector for a field's subspace; falls back to the global vector."""
+        d = self._load_all()
+        if not d:
+            return None
+        if field and field in d:
+            return d[field]
+        return d.get(_GLOBAL)
+
+    def update_vector(self, new_vecs, field: str | None = None, lr: float = 0.2, away: bool = False) -> None:
+        """EMA the chosen field's subspace vector (and the global) toward/away from engaged embeddings."""
         try:
             import numpy as np
             target = np.asarray(new_vecs, dtype=np.float32)
@@ -68,14 +95,18 @@ class PersonaProfile:
             if n == 0:
                 return
             target = target / n
-            cur = self.load_vector()
-            if cur is None:
-                vec = -target if away else target
-            else:
-                vec = cur + (-lr if away else lr) * target       # attract or repel
-                vec = vec / (np.linalg.norm(vec) or 1.0)
-            np.save(_vec_path(), vec.astype(np.float32))
-            self.has_pref_vector = True
+            d = self._load_all()
+
+            def _ema(cur):
+                if cur is None:
+                    return -target if away else target
+                v = cur + (-lr if away else lr) * target
+                return v / (np.linalg.norm(v) or 1.0)
+
+            keys = [_GLOBAL] + ([field] if field and field != "general" else [])
+            for k in keys:
+                d[k] = _ema(d.get(k)).astype(np.float32)
+            self._save_all(d)
         except Exception:
             pass
 
@@ -83,7 +114,9 @@ class PersonaProfile:
         tf = ", ".join(f"{k} ({v:.0%})" for k, v in self.top_fields(4)) or "not yet learned"
         prefs = ", ".join(f"{k}={v}" for k, v in self.preferences.items()) or "defaults"
         conf = "low" if self.n_signals < 5 else ("medium" if self.n_signals < 25 else "high")
-        return f"focus: {tf} | preferences: {prefs} | signals: {self.n_signals} (confidence {conf})"
+        subs = getattr(self, "pref_fields", []) or [k for k in self._load_all() if k != _GLOBAL]
+        sub = f" | subspaces: {', '.join(subs)}" if subs else ""
+        return f"focus: {tf} | preferences: {prefs} | signals: {self.n_signals} (confidence {conf}){sub}"
 
 
 def build_from_corpus(store) -> PersonaProfile:

@@ -78,6 +78,31 @@ def test_prefs_flow_into_brief(graph):
     assert any("verbosity=concise" in g for g in b["output_guidance"])
 
 
+def test_per_field_subspaces_form(tmp_path, monkeypatch):
+    """Liking chunks in different fields should create distinct per-field preference vectors."""
+    from cartograph.demo import write_corpus
+    from cartograph.embed import available
+    if not available():
+        pytest.skip("semantic extra not installed (subspace vectors require embeddings)")
+    monkeypatch.setenv("CARTOGRAPH_HOME", str(tmp_path / "home"))
+    store = Store(tmp_path / "home" / "graph.sqlite")
+    ingest_path(write_corpus(tmp_path / "corpus"), store, Config())
+    with store.cursor() as c:
+        def cid(field):
+            r = c.execute("SELECT ch.id FROM chunks ch JOIN files f ON f.id=ch.file_id "
+                          "JOIN projects p ON p.id=f.project_id WHERE p.field=? LIMIT 1", (field,)).fetchone()
+            return r[0] if r else None
+        ml, web = cid("ml_experiment"), cid("web_frontend")
+    p = load_persona(store)
+    if ml:
+        p = record_feedback(p, store, Config(), liked_chunks=[ml])
+    if web:
+        p = record_feedback(p, store, Config(), liked_chunks=[web])
+    keys = set(p._load_all().keys())
+    assert "_global" in keys
+    assert {"ml_experiment", "web_frontend"} & keys      # at least one distinct subspace formed
+
+
 def test_mcp_personalize_tool(graph, monkeypatch):
     # the persona MCP tool returns a brief; run the server as a subprocess against this workspace
     env_home = str(Path(graph.path).parent)

@@ -13,8 +13,8 @@ can prepend, so outputs adapt to you and keep adapting as you use them.
 |---|---|
 | high-dimensional space of "everything you relate to" | the embedding space (R^d) over your ingested chunks |
 | your persona as vectors in that space | per-field **weights** + an optional **preference vector** (centroid of what you engage with) |
-| many complex subspaces | per-field subsets; the prompt selects which subspace dominates |
-| "direction vectors that manipulate the graph" | retrieval **re-ranking** = base rank blended with persona alignment |
+| many complex subspaces | **one preference vector per field** (e.g. an `ml_experiment` direction *and* a `web_frontend` direction), + a global fallback — each item is scored in ITS OWN subspace |
+| "direction vectors that manipulate the graph" | retrieval **re-ranking** = base rank blended with per-subspace persona alignment |
 | "accurately or approximately by probability of data present" | a **confidence** term (data density per field + #signals) scales how hard we steer |
 | "best value for the user" | the **steering brief**: persona + field + their patterns + output guidance |
 | "adapts further with time" | **online EMA updates** to weights + preference vector from feedback |
@@ -72,16 +72,23 @@ vectors, RLHF preference models, reciprocal rank fusion, online learning to rank
   explainable, by design. It is not a claim of modeling "emotion" or a person's interior; it models
   *revealed preferences over your own work and fields*.
 
-## Built today vs. roadmap (honest)
-**Built + tested now:** field weights from corpus density · one global preference vector (EMA, attract
-*and* repel) · per-field confidence (data-density scaled steering) · personalized re-ranking · the
-model-agnostic steering brief · explicit output-tuning preferences · MCP `personalize` + `record_use`
-(implicit loop) · CLI + HTTP + browser-userscript surfaces · `carto demo`.
+## Why per-field subspaces (the value)
+A single global preference vector blurs everything you like into one direction — so a strong signal in
+your dominant field drags retrieval in *unrelated* fields toward it. Per-field vectors fix that: each
+candidate snippet is scored against the preference direction **of its own field**, so "I like terse,
+typed APIs" (library) and "I like accessible, state-first UIs" (web) coexist without bleeding into each
+other. It's the honest realization of "many complex spaces, each with its own direction vector," and it
+keeps steering sharp as your work spans more fields. Stored in `persona_vecs.npz` (one array per field +
+`_global`), all inspectable.
 
-**Natural next steps (not yet built — the "many complex subspaces" in full):**
-- **Per-field preference vectors** — one direction *per* field instead of a single global vector, so
-  steering is conditioned on the prompt's subspace (closest to the original Hilbert-space vision).
-- **Time decay / recency** — fade old signals so the persona tracks what you care about *now*.
+## Built today vs. roadmap (honest)
+**Built + tested now:** field weights from corpus density · **per-field preference subspaces** (one EMA
+direction per field, attract *and* repel) + a global fallback · **recency decay** (old emphasis fades so
+the persona tracks "now") · per-field confidence (data-density scaled steering) · subspace-aware
+re-ranking · the model-agnostic steering brief · explicit output-tuning preferences · MCP `personalize`
++ `record_use` (implicit loop) · CLI + HTTP + browser-userscript surfaces · `carto demo`.
+
+**Natural next steps (not yet built):**
 - **Learning-to-rank from the `record_use` log** — fit the blend weights (α, field vs. vector) to your
   own accept/reject history instead of fixed constants.
 - **Cross-tool event stream** — a tiny local daemon that all surfaces write to, for true real-time sync.

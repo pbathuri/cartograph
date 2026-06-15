@@ -25,21 +25,29 @@ def _field_of_projects(store, names: list[str]) -> list[str]:
                 if dict(r)["field"]]
 
 
-def _embeddings_for_chunks(store, cfg, chunk_ids: list[int]):
-    """Embed the engaged chunks' text (so the preference vector moves toward their meaning)."""
+def _embeddings_by_field(store, cfg, chunk_ids: list[int]) -> dict[str, list]:
+    """Embed engaged chunks and group their vectors by the field of the owning project — so each
+    field's SUBSPACE vector moves toward the meaning of what the user engaged with in that field."""
     try:
         from ..embed import DOC_PREFIX, _model, available
         if not available() or not chunk_ids:
-            return None
+            return {}
         ph = ",".join("?" * len(chunk_ids))
         with store.cursor() as c:
-            rows = c.execute(f"SELECT chunk_text FROM chunks WHERE id IN ({ph})", chunk_ids).fetchall()
-        texts = [DOC_PREFIX + (dict(r)["chunk_text"] or "")[:600] for r in rows]
-        if not texts:
-            return None
-        return _model(cfg.embed_model).encode(texts, normalize_embeddings=True)
+            rows = [dict(r) for r in c.execute(
+                "SELECT ch.id AS id, ch.chunk_text AS t, p.field AS field FROM chunks ch "
+                "JOIN files f ON f.id=ch.file_id LEFT JOIN projects p ON p.id=f.project_id "
+                f"WHERE ch.id IN ({ph})", chunk_ids).fetchall()]
+        if not rows:
+            return {}
+        embs = _model(cfg.embed_model).encode([DOC_PREFIX + (r["t"] or "")[:600] for r in rows],
+                                              normalize_embeddings=True)
+        out: dict[str, list] = {}
+        for r, e in zip(rows, embs):
+            out.setdefault(r["field"] or "general", []).append(e)
+        return out
     except Exception:
-        return None
+        return {}
 
 
 def record_feedback(profile: PersonaProfile, store, cfg, *, query: str = "",
@@ -52,20 +60,18 @@ def record_feedback(profile: PersonaProfile, store, cfg, *, query: str = "",
     liked_chunks = liked_chunks or []
     disliked_projects = disliked_projects or []
     disliked_chunks = disliked_chunks or []
+    profile.decay()                                                # recency: old emphasis fades a touch
     up = _field_of_projects(store, liked_projects)
     down = _field_of_projects(store, disliked_projects)
     for fld in up:
         profile.bump_field(fld, amount=0.15 * weight)
     for fld in down:
         profile.bump_field(fld, amount=-0.10 * weight)            # pull emphasis away
-    if liked_chunks:
-        emb = _embeddings_for_chunks(store, cfg, liked_chunks)
-        if emb is not None:
-            profile.update_vector(emb, lr=min(0.4, 0.2 * weight))
-    if disliked_chunks:
-        emb = _embeddings_for_chunks(store, cfg, disliked_chunks)
-        if emb is not None:
-            profile.update_vector(emb, lr=min(0.4, 0.2 * weight), away=True)   # repel
+    lr = min(0.4, 0.2 * weight)
+    for fld, vecs in _embeddings_by_field(store, cfg, liked_chunks).items():
+        profile.update_vector(vecs, field=fld, lr=lr)             # toward, in that field's subspace
+    for fld, vecs in _embeddings_by_field(store, cfg, disliked_chunks).items():
+        profile.update_vector(vecs, field=fld, lr=lr, away=True)  # away, in that field's subspace
     profile.n_signals += 1
     save_persona(profile)
     home().mkdir(parents=True, exist_ok=True)
