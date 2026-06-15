@@ -1,51 +1,31 @@
 <div align="center">
 
-<img src="docs/assets/graph.gif" alt="Cartograph — your work mapped into one graph, plugged into your AI agents" width="100%" />
+# 🗺️ Cartograph
 
-<p align="center"><em>Your AI agents are brilliant — and amnesiac. <strong>Cartograph gives them your memory.</strong></em></p>
+**Build a personal cognitive graph of everything you work with — and plug it into your AI agents.**
 
-<p align="center"><strong>One graph of everything you build · hybrid retrieval · a persona that learns <em>you</em> · plugged into any MCP agent · one <code>pip install</code></strong></p>
+*Point it at your folders. It maps your repos, notes, and docs into one searchable graph, learns your
+field, and serves the right context to Claude Code, Cursor, or any MCP agent — so every future
+task, from coding to daily generative-AI use, is grounded in **your** knowledge.*
 
-<p align="center">
-  <a href="https://pypi.org/project/cartograph__v1/"><img src="https://img.shields.io/pypi/v/cartograph__v1?style=for-the-badge&color=1E293B&labelColor=0A0A0A&logo=pypi&logoColor=white" alt="PyPI version" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-059669?style=for-the-badge&labelColor=0A0A0A" alt="License: MIT" /></a>
-  <img src="https://img.shields.io/badge/Python-3.10%2B-1E293B?style=for-the-badge&labelColor=0A0A0A&logo=python&logoColor=white" alt="Python 3.10+" />
-  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-F59520?style=for-the-badge&labelColor=0A0A0A" alt="MCP compatible" /></a>
-  <a href="https://github.com/pbathuri/cartograph/stargazers"><img src="https://img.shields.io/github/stars/pbathuri/cartograph?style=for-the-badge&logo=github&color=1E293B&labelColor=0A0A0A&logoColor=white" alt="GitHub stars" /></a>
-</p>
+Local-first · your data never leaves your machine · works on any field · no ML expertise required
 
-<p align="center">
-  <strong><a href="#-quickstart">Quickstart</a> · <a href="#-how-it-works">How it works</a> ·
-  <a href="#-the-persona-layer--steer-your-agents-to-you">Persona</a> ·
-  <a href="#-connect-your-agents">Connect agents</a> · <a href="#-install-tiers--graph-sizes">Install</a></strong>
-</p>
-
-<sub>Local-first · your data never leaves your machine · works in <em>any</em> field · no ML expertise required</sub>
+[Quickstart](#-quickstart) · [How it works](#-how-it-works) · [Connect your agents](#-connect-your-agents)
+· [Requirements](#-requirements) · [Install tiers](#-install-tiers--graph-sizes) · [Visual app](#-the-visual-app)
 
 </div>
 
 ---
 
-## ✨ The 30-second pitch
+## ✨ Why
 
-You've written thousands of files, made hundreds of decisions, and built real taste in your field — but
-every new chat with Claude, Cursor, ChatGPT or Gemini starts from zero. **Cartograph is the memory + taste
-layer in between.** Point it at your folders; it builds a searchable graph of everything you've done,
-learns *what you respond to*, and feeds your agents the right context **shaped to you** — automatically,
-on every prompt, forever. Coding, writing, research, ops — any field, your conventions.
+LLM agents are brilliant but amnesiac — they don't know your repos, your conventions, your past
+decisions, or what "good" looks like in your field. Cartograph fixes that locally:
 
-```bash
-pip install cartograph__v1 && carto demo     # see it all in ~10 seconds
-```
-
----
-
-## How it fits in 4 steps
-
-1. **Plug** — `pip install cartograph__v1` (tiny; no heavy ML required)
-2. **Ingest** — `carto ingest ~/code` maps your repos, notes & docs into one graph (incremental, any folder)
-3. **Tune** *(optional)* — add semantic search + let it learn your preferences from feedback
-4. **Auto-applied** — your agents pull grounded, *you*-shaped context over MCP — on every prompt, forever
+1. **Plug** — `pip install cartograph__v1`
+2. **Ingest** — `carto ingest ~/code` builds a graph of your work (incrementally, any folder)
+3. **(Optional) Train** — add semantic search / your own models on *your* graph
+4. **Auto-applied** — your agents query the graph over MCP for grounded context, forever
 
 No cloud. No account. Your graph is a single SQLite file you own.
 
@@ -143,9 +123,8 @@ Hilbert-space mapping, and honest limits: **[docs/PERSONA.md](docs/PERSONA.md)**
 
 Cartograph speaks **MCP** (Model Context Protocol). Add it once and your agent can query your graph.
 
-**One-step wiring:** run **`carto agent-setup`** — it prints the exact MCP config *and* the system-prompt
-rule that makes your agent call Cartograph automatically on every task (`personalize` → `retrieve_context`
-→ `record_use`). Paste them in and you're done.
+**One-step wiring:** run `carto agent-setup` — it prints the MCP config *and* a system-prompt rule that
+makes your agent call Cartograph automatically each task (`personalize` → `retrieve_context` → `record_use`).
 
 **Claude Code / Cursor** — add to your MCP config (`~/.cursor/mcp.json` or Claude Code's MCP settings):
 ```json
@@ -242,8 +221,8 @@ Field inference lives in `cartograph/ingest.py`.
 
 ## 🗂️ Commands
 
-`carto demo · agent-setup · init · ingest · index · retrieve · elevate · frontier · review · persona · personalize ·
-feedback · prefs · serve · stats · viz · mcp-server · doctor` (run `carto --help` or `carto <cmd> --help`).
+`carto demo · agent-setup · init · ingest · index · retrieve · elevate · frontier · review · persona ·
+personalize · feedback · prefs · serve · stats · viz · mcp-server · doctor` (run `carto --help`).
 
 ## License
 
