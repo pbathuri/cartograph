@@ -3,6 +3,23 @@
 The package is configured and builds clean (`twine check` passes). To publish so anyone can
 `pip install cartograph`, run these from the repo root.
 
+## Easiest: automated Trusted Publishing (no token) — recommended
+A GitHub Actions workflow (`.github/workflows/release.yml`) publishes to PyPI on every version tag,
+with **no API token stored anywhere** (uses OIDC). One-time setup:
+1. Create the project on PyPI (first manual upload below, or a pending publisher).
+2. PyPI → your project → **Publishing** → add a **GitHub** publisher: repo `pbathuri/cartograph`,
+   workflow `release.yml`, environment `pypi`.
+3. Then forever after:
+   ```bash
+   # bump version in pyproject.toml + cartograph/__init__.py, commit, then:
+   git tag v0.2.0 && git push --tags
+   ```
+   The workflow builds, `twine check`s, and publishes. Done.
+
+---
+
+## Manual path (API token)
+
 ## 0. One-time: get a PyPI API token
 Create a token at https://pypi.org/manage/account/token/ (scope it to this project after the first
 upload). Never commit it. Use it as the password with username `__token__`, or put it in `~/.pypirc`.
