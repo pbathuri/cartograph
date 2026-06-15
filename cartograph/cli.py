@@ -3,7 +3,7 @@
 Typical first run:
     carto init                      # interactive setup wizard
     carto ingest ~/code             # build your graph from a folder (re-run anytime; incremental)
-    carto index                     # (optional) add semantic search — needs `pip install cartograph[semantic]`
+    carto index                     # (optional) add semantic search — needs `pip install cartograph__v1[semantic]`
     carto viz                       # open the visual graph in your browser
     carto mcp-server                # plug into Claude Code / Cursor (see README)
 """
@@ -106,11 +106,11 @@ def ingest(
 
 @app.command()
 def index() -> None:
-    """Build the semantic vector index (needs `pip install cartograph[semantic]`). Re-run after ingest."""
+    """Build the semantic vector index (needs `pip install cartograph__v1[semantic]`). Re-run after ingest."""
     from .embed import available, build_index
     if not available():
         console.print(r"[yellow]semantic extra not installed.[/yellow] "
-                      r"Run: [bold]pip install 'cartograph\[semantic]'[/bold] (adds ~2GB; GPU-accelerated if present).")
+                      r"Run: [bold]pip install 'cartograph__v1\[semantic]'[/bold] (adds ~2GB; GPU-accelerated if present).")
         raise typer.Exit(1)
     cfg = load_config()
     console.print("[bold]building semantic index[/bold] (first run downloads the model) …")
@@ -327,13 +327,13 @@ def doctor() -> None:
     console.print(f"cartograph {__version__}")
     console.print(f"workspace: {home()}")
     console.print(f"graph db : {'present' if db_path().exists() else 'not built (run carto ingest)'}")
-    console.print(r"semantic : " + ("enabled" if sem_ok() else r"off — pip install 'cartograph\[semantic]'"))
+    console.print(r"semantic : " + ("enabled" if sem_ok() else r"off — pip install 'cartograph__v1\[semantic]'"))
     console.print(f"index    : {'built' if (index_dir()/'vectors.npy').exists() else 'not built (carto index)'}")
     try:
         import torch
         console.print(f"torch    : {torch.__version__}  cuda={torch.cuda.is_available()}")
     except Exception:
-        console.print(r"torch    : not installed (CPU embedding only; pip install 'cartograph\[ml]')")
+        console.print(r"torch    : not installed (CPU embedding only; pip install 'cartograph__v1\[ml]')")
 
 
 if __name__ == "__main__":
