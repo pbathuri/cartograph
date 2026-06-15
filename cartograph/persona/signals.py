@@ -60,13 +60,17 @@ def record_feedback(profile: PersonaProfile, store, cfg, *, query: str = "",
     liked_chunks = liked_chunks or []
     disliked_projects = disliked_projects or []
     disliked_chunks = disliked_chunks or []
+    top_before = {f for f, _ in profile.top_fields(3)}             # what the persona predicted (pre-update)
     profile.decay()                                                # recency: old emphasis fades a touch
     up = _field_of_projects(store, liked_projects)
     down = _field_of_projects(store, disliked_projects)
     for fld in up:
         profile.bump_field(fld, amount=0.15 * weight)
+        profile.tune_alpha(fld in top_before)                      # learn: did steering predict this hit?
     for fld in down:
         profile.bump_field(fld, amount=-0.10 * weight)            # pull emphasis away
+        if fld in top_before:
+            profile.tune_alpha(False)                              # over-steered toward a disliked field
     lr = min(0.4, 0.2 * weight)
     for fld, vecs in _embeddings_by_field(store, cfg, liked_chunks).items():
         profile.update_vector(vecs, field=fld, lr=lr)             # toward, in that field's subspace

@@ -26,10 +26,11 @@ def _project_fields(store: Store, names: list[str]) -> dict[str, str]:
 
 
 def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
-                          *, top_k: int = 8, alpha: float = 0.35) -> dict:
+                          *, top_k: int = 8, alpha: float | None = None) -> dict:
     """Retrieve, then blend the base rank with a persona alignment score.
     final = (1-alpha)*base_rank_score + alpha*persona_score. Persona score = field weight of the chunk's
-    project (always available) + preference-vector cosine (if a vector exists). Confidence-scaled."""
+    project (always available) + preference-vector cosine (if a vector exists). Confidence-scaled.
+    `alpha` defaults to the persona's LEARNED alpha (tuned from the record_use log)."""
     res = retrieve(prompt, store, cfg, top_k=max(top_k * 2, 12))
     chunks = res.chunks
     if not chunks:
@@ -37,7 +38,8 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     pf = _project_fields(store, list({c.get("project_name") for c in chunks if c.get("project_name")}))
     # confidence in steering grows with how much we know about the user
     steer_conf = min(1.0, persona.n_signals / 20.0) if persona.n_signals else (0.3 if persona.field_weights else 0.0)
-    a = alpha * (0.4 + 0.6 * steer_conf)
+    base_alpha = alpha if alpha is not None else getattr(persona, "learned_alpha", 0.35)
+    a = base_alpha * (0.4 + 0.6 * steer_conf)
     vecs = persona._load_all()                              # per-field subspace vectors + _global
     scored = []
     n = len(chunks)

@@ -85,13 +85,21 @@ keeps steering sharp as your work spans more fields. Stored in `persona_vecs.npz
 **Built + tested now:** field weights from corpus density · **per-field preference subspaces** (one EMA
 direction per field, attract *and* repel) + a global fallback · **recency decay** (old emphasis fades so
 the persona tracks "now") · per-field confidence (data-density scaled steering) · subspace-aware
-re-ranking · the model-agnostic steering brief · explicit output-tuning preferences · MCP `personalize`
-+ `record_use` (implicit loop) · CLI + HTTP + browser-userscript surfaces · `carto demo`.
+re-ranking · **learned steering strength (α)** — *learning-to-rank from the `record_use` log* · the
+model-agnostic steering brief · explicit output-tuning preferences · MCP `personalize` + `record_use`
+(implicit loop) · CLI + HTTP + browser-userscript surfaces · `carto demo`.
+
+### How α self-tunes (learning-to-rank)
+The blend `final = (1-α)·base_rank + α·persona_alignment` no longer uses a fixed α. Each feedback
+signal asks: *did the persona's emphasis predict what the user found useful?* If you liked something in a
+field the persona already favored (a **hit**), α rises — trust the persona more. If you valued something
+**off**-persona, or disliked an on-persona item (a **miss**/over-steer), α falls. It's a bounded online
+update (α ∈ [0.1, 0.7]) straight off your own accept/reject history — so steering strength is itself
+learned from you, not hand-set. Persisted in `persona.json` (`learned_alpha`), shown in `carto persona`.
 
 **Natural next steps (not yet built):**
-- **Learning-to-rank from the `record_use` log** — fit the blend weights (α, field vs. vector) to your
-  own accept/reject history instead of fixed constants.
 - **Cross-tool event stream** — a tiny local daemon that all surfaces write to, for true real-time sync.
+- **Contextual α** — learn α *per field/prompt-type*, not just globally.
 
 These are deliberately staged: the current version is simple, inspectable, and useful on day one;
 the roadmap adds power without giving up that transparency.

@@ -30,9 +30,16 @@ class PersonaProfile:
     confidence: dict[str, float] = field(default_factory=dict)      # field -> 0..1 data density
     n_signals: int = 0
     has_pref_vector: bool = False
+    learned_alpha: float = 0.35      # how hard to steer; LEARNED from whether the persona predicted hits
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    def tune_alpha(self, predicted: bool, lr: float = 0.03) -> None:
+        """Learning-to-rank: if the persona's emphasis matched what the user found useful, trust it more
+        (raise alpha); if it missed (user valued something off-persona, or disliked an on-persona item),
+        steer less. Bounded so it can never fully dominate or vanish."""
+        self.learned_alpha = round(min(0.7, max(0.1, self.learned_alpha + (lr if predicted else -lr))), 4)
 
     # ---- field weights ----
     def top_fields(self, k: int = 5) -> list[tuple[str, float]]:
@@ -116,7 +123,8 @@ class PersonaProfile:
         conf = "low" if self.n_signals < 5 else ("medium" if self.n_signals < 25 else "high")
         subs = getattr(self, "pref_fields", []) or [k for k in self._load_all() if k != _GLOBAL]
         sub = f" | subspaces: {', '.join(subs)}" if subs else ""
-        return f"focus: {tf} | preferences: {prefs} | signals: {self.n_signals} (confidence {conf}){sub}"
+        return (f"focus: {tf} | preferences: {prefs} | signals: {self.n_signals} (confidence {conf}) "
+                f"| steer α={self.learned_alpha:.2f}{sub}")
 
 
 def build_from_corpus(store) -> PersonaProfile:

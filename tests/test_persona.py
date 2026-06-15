@@ -103,6 +103,21 @@ def test_per_field_subspaces_form(tmp_path, monkeypatch):
     assert {"ml_experiment", "web_frontend"} & keys      # at least one distinct subspace formed
 
 
+def test_learned_alpha_rises_on_predicted_hits_falls_on_misses(graph):
+    from cartograph.persona.profile import PersonaProfile, save_persona
+    # persona already emphasizes ml_experiment; liking an ml project = predicted hit -> alpha up
+    p = PersonaProfile(field_weights={"ml_experiment": 0.9, "web_frontend": 0.1}, learned_alpha=0.35)
+    save_persona(p)
+    p = record_feedback(p, graph, Config(), liked_projects=["ml_project"])  # ml_project -> ml_experiment
+    assert p.learned_alpha > 0.35                      # persona predicted the useful field -> trust more
+    # now ml_experiment is OUTSIDE the top-3 -> liking an ml project is a 'miss' -> alpha comes down
+    p2 = PersonaProfile(field_weights={"hpc": 0.4, "quant": 0.3, "web_frontend": 0.2, "ml_experiment": 0.1},
+                        learned_alpha=0.5)
+    save_persona(p2)
+    p2 = record_feedback(p2, graph, Config(), liked_projects=["ml_project"])  # ml not in top-3 -> miss
+    assert p2.learned_alpha < 0.5
+
+
 def test_mcp_personalize_tool(graph, monkeypatch):
     # the persona MCP tool returns a brief; run the server as a subprocess against this workspace
     env_home = str(Path(graph.path).parent)
