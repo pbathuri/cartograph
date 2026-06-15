@@ -25,11 +25,20 @@ def _project_fields(store: Store, names: list[str]) -> dict[str, str]:
 
 
 def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
-                          *, top_k: int = 8, alpha: float | None = None) -> dict:
+                          *, top_k: int = 8, alpha: float | None = None,
+                          tuning: dict | None = None) -> dict:
     """Retrieve, then blend the base rank with a persona alignment score.
     final = (1-alpha)*base_rank_score + alpha*persona_score. Persona score = field weight of the chunk's
     project (always available) + preference-vector cosine (if a vector exists). Confidence-scaled.
-    `alpha` defaults to the persona's LEARNED alpha (tuned from the record_use log)."""
+    `alpha` defaults to the persona's LEARNED alpha (tuned from the record_use log).
+    `tuning` (optional) overrides the steering knobs for ablation/config sweeps; defaults are production."""
+    T = tuning or {}
+    use_context = T.get("use_context", True)               # contextual vs global affinity
+    use_gate = T.get("use_gate", True)                     # project-rank relevance gate
+    use_protect = T.get("use_protect", True)               # top-hit protection
+    gate_div = T.get("gate_div", 2.0)
+    dislike_thr = T.get("dislike_thr", -0.4)
+    dislike_evd = T.get("dislike_evd", 2)
     res = retrieve(prompt, store, cfg, top_k=max(top_k * 2, 12))
     chunks = res.chunks
     if not chunks:
@@ -47,7 +56,7 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     _na = lambda s: "".join(c for c in (s or "").lower() if c.isalnum())  # noqa: E731
     # Affinity is CONTEXTUAL (preference for this KIND of query) when a context model exists, else global.
     from ..context_affinity import load_context_affinity, query_vector
-    ctx = load_context_affinity() if reranker is not None else None
+    ctx = load_context_affinity() if (reranker is not None and use_context) else None
     qv = query_vector(prompt, cfg) if ctx is not None else None
     gaff = project_affinities() if reranker is not None else {}
     ctx_on = ctx is not None and qv is not None
@@ -88,12 +97,12 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
                 import numpy as np
                 pc = float(max(0.0, np.dot(pv, cv)))
         pr = proj_rank.get(ch.get("project_name"), 99)
-        relgate = max(0.0, 1.0 - pr / 2.0)                  # influence only the top ~2 distinct projects
+        relgate = max(0.0, 1.0 - pr / gate_div) if use_gate else 1.0  # influence the top ~2 distinct projects
         if reranker is not None:                            # LEARNED reranker, CONTEXTUAL signal
             av, evd = _aff(ch.get("project_name"))
             feat = extract_features(base, fw, pc, 1.0 if fld == rfield else 0.0, av)
             adj = strength * (float(reranker.proba([feat])[0]) - 0.5) * relgate
-            cd = ctx_on and av <= -0.4 and evd >= 2         # contextually-confident dislike FOR THIS QUERY
+            cd = ctx_on and av <= dislike_thr and evd >= dislike_evd  # contextually-confident dislike
         else:                                               # heuristic (field weight + subspace cosine)
             ps = 0.5 * fw + 0.5 * pc if pv is not None else fw
             adj = a * (ps - 0.5) * relgate                  # centered so it re-orders, not uniformly lifts
@@ -105,7 +114,7 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     # top score UNLESS we're contextually-confident it's the wrong project for THIS kind of query. This is
     # what makes personalization do no harm (test_v1: it stops favored projects polluting clear queries),
     # while still letting a confidently-wrong incumbent be demoted so an ambiguous query can flip.
-    if scored and not cd0:
+    if use_protect and scored and not cd0:
         top_other = max((s for s, _ in scored[1:]), default=scored[0][0])
         if scored[0][0] < top_other:
             scored[0][0] = top_other + 1e-6
