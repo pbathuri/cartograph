@@ -203,6 +203,60 @@ def review(project: str = typer.Argument(..., help="Path to the build."),
 
 
 @app.command()
+def persona(rebuild: bool = typer.Option(False, "--rebuild", help="Re-derive field weights from the corpus."),
+            json_out: bool = typer.Option(False, "--json")) -> None:
+    """Show (or rebuild) your learned persona: field weights, preferences, confidence."""
+    from .persona.profile import build_from_corpus, load_persona, save_persona
+    store = _store(read_only=True)
+    p = build_from_corpus(store) if rebuild else load_persona(store)
+    if rebuild:
+        save_persona(p)
+    if json_out:
+        typer.echo(json.dumps(p.to_dict(), indent=2))
+        return
+    console.print(f"[bold]persona[/bold] — {p.summary()}")
+    for f, w in p.top_fields(8):
+        bar = "█" * int(w * 30)
+        console.print(f"  {f:16s} {w:6.1%} {bar}  [dim]conf {p.confidence.get(f, 0):.0%}[/dim]")
+
+
+@app.command()
+def personalize(prompt: str = typer.Argument(..., help="The prompt your agent is about to answer."),
+                json_out: bool = typer.Option(False, "--json")) -> None:
+    """Emit the steering brief for a prompt — the personalization envelope an agent prepends."""
+    from .persona import build_brief
+    from .persona.profile import load_persona
+    store = _store(read_only=True)
+    brief = build_brief(prompt, store, load_config(), load_persona(store))
+    if json_out:
+        typer.echo(json.dumps(brief, indent=2))
+        return
+    console.print(f"[bold]prompt field:[/bold] {brief['prompt_field']}  "
+                  f"[dim](steer confidence {brief['steer_confidence']:.0%})[/dim]")
+    console.print(f"[cyan]persona:[/cyan] {brief['persona_summary']}")
+    console.print("[magenta]output guidance:[/magenta]")
+    for g in brief["output_guidance"]:
+        console.print(f"  - {g}")
+    if brief["relevant_context"]:
+        console.print("[green]ground in:[/green]")
+        for c in brief["relevant_context"][:4]:
+            console.print(f"  {c['project']}  [dim]{c['file']}[/dim]")
+
+
+@app.command()
+def feedback(query: str = typer.Option("", "--query", help="The query this feedback is about."),
+             liked: list[str] = typer.Option(None, "--liked", help="Project(s) that were useful. Repeatable."),
+             weight: float = typer.Option(1.0, "--weight")) -> None:
+    """Record a preference signal — teaches the persona what you respond to (adapts over time)."""
+    from .persona import record_feedback
+    from .persona.profile import load_persona
+    store = _store(read_only=True)
+    p = record_feedback(load_persona(store), store, load_config(),
+                        query=query, liked_projects=list(liked or []), weight=weight)
+    console.print(f"[green]✓ recorded[/green] (signal #{p.n_signals}). persona: {p.summary()}")
+
+
+@app.command()
 def stats() -> None:
     """Show graph counts."""
     s = _store(read_only=True).stats()
@@ -222,6 +276,14 @@ def viz(port: int = typer.Option(8787, "--port"), no_open: bool = typer.Option(F
     """Launch the interactive visual graph in your browser."""
     from .viz.app import launch
     launch(port=port, open_browser=not no_open)
+
+
+@app.command()
+def serve(port: int = typer.Option(8787, "--port")) -> None:
+    """Run the local API (no browser) — exposes /api/personalize for browser userscripts (web GenAI)."""
+    from .viz.app import launch
+    console.print(f"Cartograph API on http://127.0.0.1:{port}  — GET /api/personalize?prompt=...")
+    launch(port=port, open_browser=False)
 
 
 @app.command()

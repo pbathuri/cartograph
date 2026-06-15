@@ -30,6 +30,7 @@ def _make_handler():
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")  # local API for browser userscripts
             self.end_headers()
             self.wfile.write(body if isinstance(body, bytes) else body.encode("utf-8"))
 
@@ -52,6 +53,18 @@ def _make_handler():
                                                        "chunks": res.chunks[:8]}))
                 except Exception as e:
                     return self._send(200, json.dumps({"error": str(e), "projects": [], "chunks": []}))
+            if u.path == "/api/personalize":
+                # The cross-app hook: any web GenAI userscript fetches this and prepends the brief.
+                q = (parse_qs(u.query).get("prompt") or parse_qs(u.query).get("q") or [""])[0]
+                self.send_header  # (CORS set in _send)
+                store = Store(db_path(), read_only=True)
+                try:
+                    from ..persona import build_brief
+                    from ..persona.profile import load_persona
+                    brief = build_brief(q, store, load_config(), load_persona(store), top_k=6)
+                    return self._send(200, json.dumps(brief))
+                except Exception as e:
+                    return self._send(200, json.dumps({"error": str(e), "output_guidance": []}))
             return self._send(404, json.dumps({"error": "not found"}))
     return Handler
 

@@ -30,6 +30,12 @@ TOOLS = [
      "description": "Coverage of each field's top-tier reference repos in your graph + the prioritized "
                     "acquisition backlog.",
      "params": {"top": "int? (default 8)"}},
+    {"name": "personalize",
+     "description": "THE personalization hook — call FIRST on any user prompt. Returns a steering brief "
+                    "(the user's persona/field focus, output guidance, and persona-ranked relevant "
+                    "snippets) to prepend so your answer fits this specific user and their work. Adapts "
+                    "as feedback accrues.",
+     "params": {"prompt": "string", "top_k": "int? (default 6)"}},
     {"name": "graph_stats",
      "description": "Counts in your graph (projects/files/chunks/edges).", "params": {}},
 ]
@@ -89,6 +95,14 @@ def _dispatch(rid: Any, name: str, args: dict) -> str:
         if name == "frontier_status":
             from .elite import frontier_report
             return _resp(rid, frontier_report(store, top=int(args.get("top", 8))))
+        if name == "personalize":
+            from .persona import build_brief
+            from .persona.profile import load_persona
+            prompt = args.get("prompt", "")
+            if not prompt:
+                return _resp(rid, error="prompt is required")
+            return _resp(rid, build_brief(prompt, store, cfg, load_persona(store),
+                                          top_k=int(args.get("top_k", 6))))
     except Exception as e:  # noqa: BLE001 - never hang the client
         return _resp(rid, error=f"{name} failed: {e}")
     return _resp(rid, error=f"unhandled: {name}")

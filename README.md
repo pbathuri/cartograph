@@ -99,6 +99,23 @@ devops, mobile, game-dev, research, libraries — and is one file to extend):
 - `carto frontier` — how much of your field's top-tier reference set you've ingested + what to add
 - `carto review <project> --field <f>` — grade a build against the field's Definition-of-Done
 
+### 🧭 The persona layer — steer your agents *to you*
+
+The graph knows your work; the **persona layer** learns *what you respond to* and shapes every answer.
+It models you as field weights + an optional preference vector in embedding space, re-ranks retrieval by
+alignment to you, and emits a model-agnostic **steering brief** any agent prepends — so Claude / Cursor /
+ChatGPT / Gemini outputs adapt to your field, conventions, and preferences, and **keep adapting** as you
+give feedback. Confidence-scaled: well-supported preferences steer hard, sparse ones barely nudge.
+
+```bash
+carto persona                         # your learned focus + confidence
+carto personalize "how do I cache this?"   # the steering brief an agent prepends
+carto feedback --liked my-repo        # teach it what was useful (adapts over time)
+```
+The same brief is available to agents via the MCP `personalize` tool and to web GenAI via
+`carto serve` + a tiny userscript ([docs/BROWSER.md](docs/BROWSER.md)). Foundations, the
+Hilbert-space mapping, and honest limits: **[docs/PERSONA.md](docs/PERSONA.md)**.
+
 ---
 
 ## 🔌 Connect your agents
@@ -117,6 +134,7 @@ Cartograph speaks **MCP** (Model Context Protocol). Add it once and your agent c
 Your agent now has these tools:
 | Tool | What it gives the agent |
 |---|---|
+| **`personalize`** | **call first** — a steering brief (your persona, field, output guidance + your relevant snippets) so the answer fits *you* and adapts over time |
 | `retrieve_context` | the relevant code/doc **snippets** to inject (hybrid) |
 | `relevant_projects` | which of your repos relate to the task |
 | `elevate_task` | top-of-field briefing: bar + reference repos + playbook |
@@ -198,8 +216,8 @@ Field inference lives in `cartograph/ingest.py`.
 
 ## 🗂️ Commands
 
-`carto init · ingest · index · retrieve · elevate · frontier · review · stats · viz · mcp-server · doctor`
-(run `carto --help` or `carto <cmd> --help`).
+`carto init · ingest · index · retrieve · elevate · frontier · review · persona · personalize · feedback ·
+serve · stats · viz · mcp-server · doctor` (run `carto --help` or `carto <cmd> --help`).
 
 ## License
 
