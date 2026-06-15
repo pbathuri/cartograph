@@ -1,0 +1,244 @@
+"""`carto` — the Cartograph CLI. Plug, ingest, (optionally) embed, then retrieve / elevate / serve / view.
+
+Typical first run:
+    carto init                      # interactive setup wizard
+    carto ingest ~/code             # build your graph from a folder (re-run anytime; incremental)
+    carto index                     # (optional) add semantic search — needs `pip install cartograph[semantic]`
+    carto viz                       # open the visual graph in your browser
+    carto mcp-server                # plug into Claude Code / Cursor (see README)
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import typer
+from rich.console import Console
+
+# Make output bulletproof across platforms: on Windows, a piped/redirected stdout defaults to cp1252
+# and crashes on '✓'/'—'/etc. Force UTF-8 with replacement so the CLI never dies on an emoji.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    except Exception:
+        pass
+
+from . import __version__
+from .config import Config, db_path, home, index_dir, load_config, save_config
+from .storage import Store
+
+app = typer.Typer(add_completion=False, help="Cartograph — your personal cognitive graph for AI work.")
+console = Console()
+
+
+def _store(read_only: bool = False) -> Store:
+    return Store(db_path(), read_only=read_only)
+
+
+@app.command()
+def version() -> None:
+    """Print version + workspace location."""
+    console.print(f"cartograph {__version__}")
+    console.print(f"workspace: {home()}  (override with CARTOGRAPH_HOME)")
+
+
+@app.command()
+def init(
+    roots: list[str] = typer.Option(None, "--root", help="Folder(s) to ingest. Repeatable."),
+    field: list[str] = typer.Option(None, "--field", help="Your domain(s), e.g. ml_experiment. Repeatable."),
+    yes: bool = typer.Option(False, "--yes", help="Non-interactive: accept defaults / provided flags."),
+) -> None:
+    """Set up your workspace + config (interactive). Safe to re-run."""
+    cfg = load_config()
+    if roots:
+        cfg.roots = [str(Path(r).expanduser()) for r in roots]
+    if field:
+        cfg.field_focus = list(field)
+    if not yes and not roots:
+        console.print("[bold]Cartograph setup[/bold] — your graph lives at "
+                      f"[cyan]{home()}[/cyan] (set CARTOGRAPH_HOME to use a big/fast drive).\n")
+        raw = typer.prompt("Folder(s) to ingest (comma-separated, e.g. ~/code, ~/notes)", default="")
+        if raw.strip():
+            cfg.roots = [str(Path(r.strip()).expanduser()) for r in raw.split(",") if r.strip()]
+        fr = typer.prompt("Your field(s) (optional, comma-separated; or leave blank to auto-detect)",
+                          default="")
+        if fr.strip():
+            cfg.field_focus = [f.strip() for f in fr.split(",") if f.strip()]
+    p = save_config(cfg)
+    _store()  # create schema
+    console.print(f"\n[green]✓ workspace ready[/green]  config: {p}")
+    if cfg.roots:
+        console.print(f"  roots: {', '.join(cfg.roots)}")
+        console.print("  next: [bold]carto ingest[/bold]  (uses your configured roots)")
+    else:
+        console.print("  next: [bold]carto ingest <folder>[/bold]")
+
+
+@app.command()
+def ingest(
+    path: list[str] = typer.Argument(None, help="Folder(s) to ingest. Defaults to configured roots."),
+) -> None:
+    """Build/refresh your graph from folders (incremental — only changed files reprocess)."""
+    cfg = load_config()
+    targets = list(path) if path else cfg.roots
+    if not targets:
+        console.print("[red]No folders.[/red] Pass a path or run `carto init` to set roots.")
+        raise typer.Exit(1)
+    from .ingest import ingest_path
+    store = _store()
+    total = {"projects": 0, "files_indexed": 0, "chunks": 0}
+    fields: dict = {}
+    for t in targets:
+        console.print(f"[bold]ingesting[/bold] {t} …")
+        st = ingest_path(t, store, cfg, progress=lambda m: console.print(f"  {m}", style="dim"))
+        total["projects"] += st.projects
+        total["files_indexed"] += st.files_indexed
+        total["chunks"] += st.chunks
+        for k, v in st.fields.items():
+            fields[k] = fields.get(k, 0) + v
+    console.print(f"\n[green]✓ ingested[/green] {total['projects']} projects · "
+                  f"{total['files_indexed']} files · {total['chunks']} chunks")
+    if fields:
+        console.print("  fields: " + ", ".join(f"{k}({v})" for k, v in sorted(fields.items(), key=lambda x: -x[1])))
+    console.print("  next: [bold]carto index[/bold] for semantic search, or [bold]carto viz[/bold] to explore")
+
+
+@app.command()
+def index() -> None:
+    """Build the semantic vector index (needs `pip install cartograph[semantic]`). Re-run after ingest."""
+    from .embed import available, build_index
+    if not available():
+        console.print(r"[yellow]semantic extra not installed.[/yellow] "
+                      r"Run: [bold]pip install 'cartograph\[semantic]'[/bold] (adds ~2GB; GPU-accelerated if present).")
+        raise typer.Exit(1)
+    cfg = load_config()
+    console.print("[bold]building semantic index[/bold] (first run downloads the model) …")
+    res = build_index(_store(read_only=True), cfg, progress=lambda m: console.print(f"  {m}", style="dim"))
+    console.print(f"[green]✓ indexed[/green] {res.get('vectors', 0)} chunks -> {res.get('dir', index_dir())}")
+
+
+@app.command()
+def retrieve(
+    query: str = typer.Argument(..., help="What to find."),
+    top_k: int = typer.Option(8, "--top-k"),
+    chunks: bool = typer.Option(False, "--chunks", help="Show snippets, not just project names."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Hybrid retrieval over your graph (semantic + keyword; semantic auto-on if indexed)."""
+    from .retrieve import retrieve as _r
+    res = _r(query, _store(read_only=True), load_config(), top_k=top_k)
+    if json_out:
+        typer.echo(json.dumps(res.to_dict(), indent=2))
+        return
+    console.print(f"[bold]{res.method}[/bold] — {len(res.projects)} projects")
+    if chunks:
+        for c in res.chunks:
+            console.print(f"[cyan]{c.get('project_name','')}[/cyan] [dim]{c.get('file_path','')}[/dim]")
+            console.print(f"  {(c.get('chunk_text','') or '')[:160].strip()}")
+    else:
+        for p in res.projects:
+            console.print(f"  {p}")
+
+
+@app.command()
+def elevate(
+    task: str = typer.Argument(..., help="The build task."),
+    project: str = typer.Option(None, "--project", help="Project path (for current grade)."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """One-shot top-of-field briefing: elite bar + reference repos + playbook + your relevant repos."""
+    from .elite import elevate as _e
+    e = _e(task, _store(read_only=True), load_config(), project=project)
+    if json_out:
+        typer.echo(json.dumps(e, indent=2))
+        return
+    console.print(f"[bold]{e['field']}[/bold]  grade={e['current_grade']}")
+    for label, key in (("elite bar", "elite_bar"), ("reference the best", "references")):
+        if e[key]:
+            console.print(f"[cyan]{label}:[/cyan]")
+            for x in e[key]:
+                console.print(f"  - {x}")
+    if e["playbook"]:
+        console.print("[magenta]frontier process:[/magenta]")
+        for i, s in enumerate(e["playbook"], 1):
+            console.print(f"  {i}. {s}")
+    if e["relevant_existing"]:
+        console.print(f"[green]you already have:[/green] {', '.join(e['relevant_existing'])}")
+
+
+@app.command()
+def frontier(top: int = typer.Option(8, "--top"), json_out: bool = typer.Option(False, "--json")) -> None:
+    """Coverage of each field's top-tier reference repos in your graph + priority backlog."""
+    from .elite import frontier_report
+    rep = frontier_report(_store(read_only=True), top=top)
+    if json_out:
+        typer.echo(json.dumps(rep, indent=2))
+        return
+    for f in rep["fields"]:
+        tag = "" if f["active"] else " (inactive)"
+        console.print(f"[bold]{f['field']}[/bold]{tag}  coverage={f['coverage_pct']}%  "
+                      f"have={len(f['covered'])} gap={len(f['gaps'])}")
+    if rep["priority_gaps"]:
+        console.print("\n[bold]Priority gaps[/bold] (weakest frontier first):")
+        for g in rep["priority_gaps"]:
+            console.print(f"  GET {g['repo']}  [dim]({g['field']}: {g['teaches']})[/dim]")
+
+
+@app.command()
+def review(project: str = typer.Argument(..., help="Path to the build."),
+           field: str = typer.Option(..., "--field", help="Field/archetype, e.g. ml_experiment."),
+           json_out: bool = typer.Option(False, "--json")) -> None:
+    """Grade a build against the elite Definition-of-Done (heuristic; reported vs verified)."""
+    from .elite import score_build
+    r = score_build(project, field)
+    if json_out:
+        typer.echo(json.dumps(r, indent=2))
+        return
+    console.print(f"[bold]{r['field']}[/bold]  grade=[cyan]{r['grade']}[/cyan]  "
+                  f"met={len(r['met'])} unmet={len(r['unmet'])}")
+    for u in r["unmet"]:
+        console.print(f"  [yellow]gap[/yellow] {u}")
+    console.print(f"[dim]{r['note']}[/dim]")
+
+
+@app.command()
+def stats() -> None:
+    """Show graph counts."""
+    s = _store(read_only=True).stats()
+    for k, v in s.items():
+        console.print(f"  {k:10s} {v:,}")
+
+
+@app.command("mcp-server")
+def mcp_server() -> None:
+    """Run the MCP server (stdio) so Claude Code / Cursor can query your graph. See README."""
+    from .mcp_server import serve
+    serve()
+
+
+@app.command()
+def viz(port: int = typer.Option(8787, "--port"), no_open: bool = typer.Option(False, "--no-open")) -> None:
+    """Launch the interactive visual graph in your browser."""
+    from .viz.app import launch
+    launch(port=port, open_browser=not no_open)
+
+
+@app.command()
+def doctor() -> None:
+    """Check your install + workspace (what's enabled, what to install for more)."""
+    from .embed import available as sem_ok
+    console.print(f"cartograph {__version__}")
+    console.print(f"workspace: {home()}")
+    console.print(f"graph db : {'present' if db_path().exists() else 'not built (run carto ingest)'}")
+    console.print(r"semantic : " + ("enabled" if sem_ok() else r"off — pip install 'cartograph\[semantic]'"))
+    console.print(f"index    : {'built' if (index_dir()/'vectors.npy').exists() else 'not built (carto index)'}")
+    try:
+        import torch
+        console.print(f"torch    : {torch.__version__}  cuda={torch.cuda.is_available()}")
+    except Exception:
+        console.print(r"torch    : not installed (CPU embedding only; pip install 'cartograph\[ml]')")
+
+
+if __name__ == "__main__":
+    app()

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Cartograph — your knowledge graph</title>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --ink:#e7e9ee; --dim:#9aa3b2; --accent:#5ea0ff; --hit:#ffd166; }
+  * { box-sizing:border-box; } html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font-family:Segoe UI, system-ui, Arial, sans-serif; }
+  #bar { display:flex; gap:12px; align-items:center; padding:10px 16px; background:var(--panel);
+    border-bottom:1px solid #232733; position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:16px; margin:0; font-weight:700; letter-spacing:.3px; }
+  #bar h1 span { color:var(--accent); }
+  #q { flex:1; max-width:560px; padding:9px 12px; border-radius:8px; border:1px solid #2b303c;
+    background:#0d0f14; color:var(--ink); font-size:14px; }
+  #stats { color:var(--dim); font-size:12.5px; }
+  #wrap { display:flex; height:calc(100vh - 53px); }
+  #net { flex:1; }
+  #side { width:340px; background:var(--panel); border-left:1px solid #232733; overflow:auto; padding:14px; }
+  #side h2 { font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.5px; margin:4px 0 8px; }
+  .hitcard { background:#0d0f14; border:1px solid #232733; border-radius:8px; padding:10px; margin-bottom:8px; }
+  .hitcard .p { color:var(--accent); font-size:12.5px; font-weight:600; }
+  .hitcard .f { color:var(--dim); font-size:11px; word-break:break-all; margin:2px 0 6px; }
+  .hitcard .t { font-size:12px; color:#c8cdd8; white-space:pre-wrap; max-height:88px; overflow:hidden; }
+  .pill { display:inline-block; background:#0d0f14; border:1px solid #2b303c; color:var(--dim);
+    padding:3px 8px; border-radius:999px; font-size:11px; margin:0 6px 6px 0; }
+  .empty { color:var(--dim); font-size:13px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <h1>Carto<span>graph</span></h1>
+  <input id="q" placeholder="Search your graph — e.g. 'how do I validate inputs' (Enter)"/>
+  <div id="stats">loading…</div>
+</div>
+<div id="wrap">
+  <div id="net"></div>
+  <div id="side">
+    <h2>Search results</h2>
+    <div id="results"><div class="empty">Type a query and press Enter. Relevant projects light up in the
+      graph; matching snippets appear here. Click a node to focus it.</div></div>
+  </div>
+</div>
+<script>
+const COLORS = {}; const PALETTE = ["#5ea0ff","#7ee787","#ffa657","#d2a8ff","#ff7b72","#79c0ff",
+  "#f0883e","#56d364","#e3b341","#db61a2","#a5d6ff","#ffab70"];
+let network, nodesDS, edgesDS, baseColor = {};
+function colorFor(field){ if(!COLORS[field]){ COLORS[field]=PALETTE[Object.keys(COLORS).length % PALETTE.length]; } return COLORS[field]; }
+
+async function loadGraph(){
+  const r = await fetch('/api/graph'); const g = await r.json();
+  const s = g.stats || {};
+  document.getElementById('stats').textContent =
+    `${s.projects||0} projects · ${s.files||0} files · ${s.chunks||0} chunks · ${s.edges||0} edges`;
+  const nodes = g.nodes.map(n => { baseColor[n.id]=colorFor(n.field||'general');
+    return { id:n.id, label:n.label, value:n.size||10, group:n.field||'general',
+      color:baseColor[n.id], font:{color:'#e7e9ee',size:13} }; });
+  const edges = g.edges.map(e => ({ from:e.source, to:e.target, color:{color:'#2b303c'} }));
+  nodesDS = new vis.DataSet(nodes); edgesDS = new vis.DataSet(edges);
+  network = new vis.Network(document.getElementById('net'), {nodes:nodesDS, edges:edgesDS}, {
+    nodes:{ shape:'dot', scaling:{min:6,max:42} },
+    physics:{ stabilization:true, barnesHut:{gravitationalConstant:-12000, springLength:140} },
+    interaction:{ hover:true, tooltipDelay:120 }
+  });
+  if(nodes.length===0){ document.getElementById('results').innerHTML =
+    '<div class="empty">Your graph is empty. Run <b>carto ingest &lt;folder&gt;</b> to populate it, then refresh.</div>'; }
+}
+function highlight(projects){
+  if(!nodesDS) return; const set = new Set(projects.map(p=>p.toLowerCase()));
+  nodesDS.forEach(n => {
+    const on = set.has((n.label||'').toLowerCase());
+    nodesDS.update({ id:n.id, color: on ? {background:'#ffd166', border:'#ffb703'} : baseColor[n.id],
+      borderWidth: on?3:1 });
+  });
+}
+async function search(){
+  const q = document.getElementById('q').value.trim(); if(!q) return;
+  const res = document.getElementById('results'); res.innerHTML = '<div class="empty">searching…</div>';
+  const r = await fetch('/api/search?q='+encodeURIComponent(q)); const d = await r.json();
+  if(d.error){ res.innerHTML = '<div class="empty">'+d.error+'</div>'; return; }
+  highlight(d.projects||[]);
+  let html = '<div style="margin-bottom:8px">'+ (d.projects||[]).map(p=>'<span class="pill">'+p+'</span>').join('') +'</div>';
+  html += '<h2>Snippets ('+(d.method||'')+')</h2>';
+  (d.chunks||[]).forEach(c=>{ html += '<div class="hitcard"><div class="p">'+(c.project_name||'')+'</div>'+
+    '<div class="f">'+(c.file_path||'')+'</div><div class="t">'+
+    ((c.chunk_text||'').slice(0,280).replace(/</g,'&lt;'))+'</div></div>'; });
+  res.innerHTML = html || '<div class="empty">no matches</div>';
+}
+document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') search(); });
+loadGraph();
+</script>
+</body>
+</html>
