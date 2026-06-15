@@ -87,9 +87,11 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
                 max_chars: int = 0) -> dict:
     """The model-agnostic personalization envelope an agent prepends before answering.
     `max_chars` (0 = unlimited) caps total snippet text so the brief fits a context budget."""
+    from ..intent import classify
     from ..router import route
     routed = route(prompt, cfg)                      # learned field router (keyword fallback)
     pfield = routed["field"]
+    intent = classify(prompt)                        # use-case type (debug/code/review/generate/explain)
     pr = personalized_retrieve(prompt, store, cfg, persona, top_k=top_k)
     prefs = {**_DEFAULT_GUIDANCE, **persona.preferences}
     guidance = []
@@ -102,6 +104,7 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
         if conf:
             guidance.append(f"This prompt is in '{pfield}', a field the user works in "
                             f"(confidence {conf:.0%}) — use their conventions + the relevant repos below.")
+    guidance.append(intent["guidance"])              # use-case-specific shaping (debug/code/explain/...)
     guidance.append("Output style: " + "; ".join(f"{k}={v}" for k, v in prefs.items()) + ".")
     if pr["chunks"]:
         guidance.append("Prefer the user's own patterns over generic ones; cite the files below.")
@@ -118,6 +121,7 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
     return {
         "prompt": prompt,
         "prompt_field": pfield,
+        "prompt_intent": intent["intent"],
         "field_routing": routed,
         "persona_summary": persona.summary(),
         "top_fields": persona.top_fields(4),

@@ -264,7 +264,8 @@ def personalize(prompt: str = typer.Argument(..., help="The prompt your agent is
     if json_out:
         typer.echo(json.dumps(brief, indent=2))
         return
-    console.print(f"[bold]prompt field:[/bold] {brief['prompt_field']}  "
+    console.print(f"[bold]prompt field:[/bold] {brief['prompt_field']} [dim](via {brief['field_routing']['method']})[/dim]  "
+                  f"[bold]intent:[/bold] {brief['prompt_intent']}  "
                   f"[dim](steer confidence {brief['steer_confidence']:.0%})[/dim]")
     console.print(f"[cyan]persona:[/cyan] {brief['persona_summary']}")
     console.print("[magenta]output guidance:[/magenta]")
