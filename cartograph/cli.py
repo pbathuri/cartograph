@@ -245,15 +245,41 @@ def personalize(prompt: str = typer.Argument(..., help="The prompt your agent is
 
 @app.command()
 def feedback(query: str = typer.Option("", "--query", help="The query this feedback is about."),
-             liked: list[str] = typer.Option(None, "--liked", help="Project(s) that were useful. Repeatable."),
+             liked: list[str] = typer.Option(None, "--liked", help="Project(s) that helped. Repeatable."),
+             disliked: list[str] = typer.Option(None, "--disliked", help="Project(s) that didn't. Repeatable."),
              weight: float = typer.Option(1.0, "--weight")) -> None:
-    """Record a preference signal — teaches the persona what you respond to (adapts over time)."""
+    """Record a preference signal — teaches the persona what you respond to MORE/LESS (adapts over time)."""
     from .persona import record_feedback
     from .persona.profile import load_persona
     store = _store(read_only=True)
-    p = record_feedback(load_persona(store), store, load_config(),
-                        query=query, liked_projects=list(liked or []), weight=weight)
+    p = record_feedback(load_persona(store), store, load_config(), query=query,
+                        liked_projects=list(liked or []), disliked_projects=list(disliked or []),
+                        weight=weight)
     console.print(f"[green]✓ recorded[/green] (signal #{p.n_signals}). persona: {p.summary()}")
+
+
+@app.command()
+def prefs(set_: list[str] = typer.Option(None, "--set", help="Output preference key=value. Repeatable, "
+                                         "e.g. --set verbosity=concise --set tone=friendly --set format=bullets."),
+          clear: bool = typer.Option(False, "--clear", help="Remove all explicit preferences."),
+          json_out: bool = typer.Option(False, "--json")) -> None:
+    """Set explicit OUTPUT-TUNING preferences (verbosity/tone/format/...) that steer every answer."""
+    from .persona.profile import load_persona, save_persona
+    store = _store(read_only=True)
+    p = load_persona(store)
+    if clear:
+        p.preferences = {}
+    for kv in (set_ or []):
+        if "=" in kv:
+            k, v = kv.split("=", 1)
+            p.preferences[k.strip()] = v.strip()
+    save_persona(p)
+    if json_out:
+        typer.echo(json.dumps(p.preferences, indent=2))
+        return
+    console.print("[bold]output preferences[/bold] (applied to every steering brief):")
+    for k, v in (p.preferences or {"(none set)": "defaults apply"}).items():
+        console.print(f"  {k} = {v}")
 
 
 @app.command()

@@ -44,22 +44,34 @@ def _embeddings_for_chunks(store, cfg, chunk_ids: list[int]):
 
 def record_feedback(profile: PersonaProfile, store, cfg, *, query: str = "",
                     liked_projects: list[str] | None = None, liked_chunks: list[int] | None = None,
+                    disliked_projects: list[str] | None = None, disliked_chunks: list[int] | None = None,
                     weight: float = 1.0) -> PersonaProfile:
-    """Record one preference signal and update the persona online. Returns the updated profile."""
+    """Record one preference signal and update the persona online (bidirectional). 'liked' moves the
+    persona toward it; 'disliked' moves it away — the full 'more/less response' loop. Returns the profile."""
     liked_projects = liked_projects or []
     liked_chunks = liked_chunks or []
-    fields = _field_of_projects(store, liked_projects)
-    for fld in fields:
+    disliked_projects = disliked_projects or []
+    disliked_chunks = disliked_chunks or []
+    up = _field_of_projects(store, liked_projects)
+    down = _field_of_projects(store, disliked_projects)
+    for fld in up:
         profile.bump_field(fld, amount=0.15 * weight)
+    for fld in down:
+        profile.bump_field(fld, amount=-0.10 * weight)            # pull emphasis away
     if liked_chunks:
         emb = _embeddings_for_chunks(store, cfg, liked_chunks)
         if emb is not None:
             profile.update_vector(emb, lr=min(0.4, 0.2 * weight))
+    if disliked_chunks:
+        emb = _embeddings_for_chunks(store, cfg, disliked_chunks)
+        if emb is not None:
+            profile.update_vector(emb, lr=min(0.4, 0.2 * weight), away=True)   # repel
     profile.n_signals += 1
     save_persona(profile)
     home().mkdir(parents=True, exist_ok=True)
     with _log_path().open("a", encoding="utf-8") as f:
         f.write(json.dumps({"ts": datetime.now(timezone.utc).isoformat(), "query": query,
                             "liked_projects": liked_projects, "liked_chunks": liked_chunks,
-                            "fields": fields, "weight": weight}) + "\n")
+                            "disliked_projects": disliked_projects, "disliked_chunks": disliked_chunks,
+                            "fields_up": up, "fields_down": down, "weight": weight}) + "\n")
     return profile
