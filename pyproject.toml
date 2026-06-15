@@ -39,8 +39,8 @@ dev = ["pytest>=7"]
 carto = "cartograph.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/OWNER/cartograph"
-Documentation = "https://github.com/OWNER/cartograph#readme"
+Homepage = "https://github.com/pbathuri/cartograph"
+Documentation = "https://github.com/pbathuri/cartograph#readme"
 
 [tool.setuptools.packages.find]
 include = ["cartograph*"]
