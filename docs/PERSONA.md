@@ -97,9 +97,29 @@ field the persona already favored (a **hit**), α rises — trust the persona mo
 update (α ∈ [0.1, 0.7]) straight off your own accept/reject history — so steering strength is itself
 learned from you, not hand-set. Persisted in `persona.json` (`learned_alpha`), shown in `carto persona`.
 
+### The trained in-between-layer models
+Cartograph now sits between your prompt and the model as a stack of small, **local, inspectable models
+trained on your own data** — no fixed heuristics where learning is possible:
+1. **Field router** (`carto train`) — one centroid embedding *per field* from your corpus; routes a
+   prompt to its field by nearest centroid. Agnostic to *any* field you have, not a keyword list.
+2. **Prompt-intent classifier** — detects the *use case* (debug / code / review / generate / explain)
+   and shapes output guidance accordingly.
+3. **Per-field preference subspaces** + **learned α** (above).
+4. **Learned reranker** (`carto train`, once feedback exists) — a NumPy logistic model over 5 features
+   (base rank, field weight, preference-vector cosine, field-match, **project affinity** from your
+   `record_use` log). It learns *which signals predict what you found useful* and replaces the
+   hand-tuned blend when trained; falls back to the heuristic otherwise. Honest: `fit_accuracy` is on
+   your own history (it's a personal recommender — `proj_affinity` intentionally encodes standing
+   preferences), not a held-out generalization claim. Stale models (feature-schema change) are ignored,
+   never crash serving.
+
+So the layer is **agnostic on three axes** — field (router), use-case (intent), and your revealed
+preferences (subspaces + reranker) — and each axis is learned from *you*.
+
 **Natural next steps (not yet built):**
 - **Cross-tool event stream** — a tiny local daemon that all surfaces write to, for true real-time sync.
-- **Contextual α** — learn α *per field/prompt-type*, not just globally.
+- **Contextual α / per-field reranker** — separate learned weights per field/prompt-type.
+- **Held-out reranker eval** — time-split the feedback log to report true generalization, not just fit.
 
 These are deliberately staged: the current version is simple, inspectable, and useful on day one;
 the roadmap adds power without giving up that transparency.

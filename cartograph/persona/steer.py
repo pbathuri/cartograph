@@ -40,19 +40,33 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     base_alpha = alpha if alpha is not None else getattr(persona, "learned_alpha", 0.35)
     a = base_alpha * (0.4 + 0.6 * steer_conf)
     vecs = persona._load_all()                              # per-field subspace vectors + _global
+    from ..rerank_model import extract_features, load as load_reranker, project_affinities
+    from ..router import route
+    reranker = load_reranker()                             # learned model (None until `carto train` on feedback)
+    rfield = route(prompt, cfg)["field"] if reranker is not None else None
+    aff = project_affinities() if reranker is not None else {}
+    _na = lambda s: "".join(c for c in (s or "").lower() if c.isalnum())  # noqa: E731
     scored = []
     n = len(chunks)
     for i, ch in enumerate(chunks):
         base = 1.0 - i / n                                  # base rank, 1..0
         fld = pf.get(ch.get("project_name", ""), "general")
-        ps = persona.field_weights.get(fld, 0.0)            # field-weight component (always on)
+        fw = persona.field_weights.get(fld, 0.0)            # field-weight component (always on)
+        pc = 0.0
         pv = vecs.get(fld) if fld in vecs else vecs.get("_global")  # score IN the chunk's subspace
         if pv is not None:
             cv = _chunk_vec(ch, cfg)
             if cv is not None:
                 import numpy as np
-                ps = 0.5 * ps + 0.5 * float(max(0.0, np.dot(pv, cv)))
-        scored.append(((1 - a) * base + a * ps, ch))
+                pc = float(max(0.0, np.dot(pv, cv)))
+        if reranker is not None:                            # LEARNED reranker decides the score
+            feat = extract_features(base, fw, pc, 1.0 if fld == rfield else 0.0,
+                                    aff.get(_na(ch.get("project_name")), 0.0))
+            score = float(reranker.proba([feat])[0])
+        else:                                               # heuristic blend (hand-tuned, learned-alpha)
+            ps = 0.5 * fw + 0.5 * pc if pv is not None else fw
+            score = (1 - a) * base + a * ps
+        scored.append((score, ch))
     scored.sort(key=lambda t: t[0], reverse=True)
     out_chunks = [c for _, c in scored][:top_k]
     projects: list[str] = []
@@ -60,8 +74,10 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
         nm = c.get("project_name")
         if nm and nm not in projects:
             projects.append(nm)
-    return {"method": res.method + "+persona", "chunks": out_chunks, "projects": projects,
-            "personalized": True, "steer_confidence": round(steer_conf, 3)}
+    method = res.method + ("+reranker" if reranker is not None else "+persona")
+    return {"method": method, "chunks": out_chunks, "projects": projects,
+            "personalized": True, "steer_confidence": round(steer_conf, 3),
+            "reranker": reranker is not None}
 
 
 def _chunk_vec(ch: dict, cfg: Config):

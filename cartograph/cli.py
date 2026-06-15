@@ -215,10 +215,22 @@ def train() -> None:
     console.print("[bold]training field router[/bold] (centroid per field from your corpus) …")
     counts = build_centroids(_store(read_only=True), load_config(),
                              progress=lambda m: console.print(f"  {m}", style="dim"))
-    if not counts:
-        console.print("[yellow]no field-labeled chunks yet[/yellow] — run carto ingest (declare --field for best labels).")
-        return
-    console.print("[green]✓ router trained[/green] on " + ", ".join(f"{k}({v})" for k, v in counts.items()))
+    if counts:
+        console.print("[green]✓ router trained[/green] on " + ", ".join(f"{k}({v})" for k, v in counts.items()))
+    else:
+        console.print("[yellow]no field-labeled chunks[/yellow] for the router — run carto ingest (declare --field).")
+    # learned reranker from the feedback log (self-improving; activates once enough signals exist)
+    from .rerank_model import train_from_log
+    from .persona.profile import load_persona
+    store = _store(read_only=True)
+    rep = train_from_log(store, load_config(), load_persona(store))
+    if rep.get("trained"):
+        console.print(f"[green]✓ reranker trained[/green] on {rep['examples']} labeled candidates "
+                      f"from {rep['events']} feedback events (fit {rep['fit_accuracy']:.0%} on your history)")
+        console.print(f"  learned weights: {rep['weights']}")
+    else:
+        console.print(f"[dim]reranker: {rep.get('reason')} — give feedback (carto feedback / MCP record_use), "
+                      f"then re-run carto train[/dim]")
 
 
 @app.command()
