@@ -22,7 +22,7 @@ Local-first · your data never leaves your machine · works on any field · no M
 LLM agents are brilliant but amnesiac — they don't know your repos, your conventions, your past
 decisions, or what "good" looks like in your field. Cartograph fixes that locally:
 
-1. **Plug** — `pip install cartograph`
+1. **Plug** — `pip install cartograph__v1`
 2. **Ingest** — `carto ingest ~/code` builds a graph of your work (incrementally, any folder)
 3. **(Optional) Train** — add semantic search / your own models on *your* graph
 4. **Auto-applied** — your agents query the graph over MCP for grounded context, forever
@@ -34,7 +34,7 @@ No cloud. No account. Your graph is a single SQLite file you own.
 ## 🚀 Quickstart
 
 ```bash
-pip install cartograph            # tiny, instant — no heavy ML
+pip install cartograph__v1            # PyPI package name; the command is `carto`, the import is `cartograph`
 carto demo                        # ⚡ see it ALL work in ~10s on a synthetic corpus (zero setup)
 carto init                        # pick folder(s) + your field(s) — declaring your field makes labels accurate
 carto ingest                      # build your graph (re-run anytime; only changed files reprocess)
@@ -44,7 +44,7 @@ carto retrieve "how did I handle auth" --chunks   # hybrid search over everythin
 
 Want semantic (meaning-based) search too?
 ```bash
-pip install "cartograph[semantic]"   # ~2GB; uses your GPU if present, else CPU
+pip install "cartograph__v1[semantic]"   # ~2GB; uses your GPU if present, else CPU
 carto index                          # embed your chunks once
 ```
 
@@ -157,7 +157,7 @@ Your agent now has these tools:
 | RAM | 4 GB | 16 GB+ |
 | Disk | ~50 MB + your data | put the graph on a fast/large drive (`CARTOGRAPH_HOME`) |
 | GPU | none (CPU works) | any CUDA GPU → ~10× faster embedding |
-| Heavy ML | **not required** | `cartograph[semantic]` for meaning-based search |
+| Heavy ML | **not required** | `cartograph__v1[semantic]` for meaning-based search |
 
 **Efficiency tips**
 - Put your workspace on a fast, roomy drive: `export CARTOGRAPH_HOME=/mnt/fast/cartograph`.
@@ -174,10 +174,10 @@ Cartograph is **modular** — install only what you need, and grow the graph to 
 
 | Install | Command | Adds |
 |---|---|---|
-| **Core** | `pip install cartograph` | full graph + keyword search + viz + MCP. Tiny, instant. |
-| **Semantic** | `pip install "cartograph[semantic]"` | meaning-based + hybrid search (~2 GB model) |
-| **ML** | `pip install "cartograph[ml]"` | train your own graph models on your data |
-| **Everything** | `pip install "cartograph[full]"` | all of the above |
+| **Core** | `pip install cartograph__v1` | full graph + keyword search + viz + MCP. Tiny, instant. |
+| **Semantic** | `pip install "cartograph__v1[semantic]"` | meaning-based + hybrid search (~2 GB model) |
+| **ML** | `pip install "cartograph__v1[ml]"` | train your own graph models on your data |
+| **Everything** | `pip install "cartograph__v1[full]"` | all of the above |
 
 **Graph-size tiers** — *don't* download one giant graph. Choose what fits:
 - **Your own** (recommended): `carto ingest` your folders — the graph is exactly your scale.

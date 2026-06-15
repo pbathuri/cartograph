@@ -3,7 +3,8 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cartograph"
+# PyPI distribution name (the import module stays `cartograph` and the CLI stays `carto`).
+name = "cartograph__v1"
 version = "0.2.0"
 description = "Build a personal cognitive graph of everything you work with, and plug it into your AI agents."
 readme = "README.md"

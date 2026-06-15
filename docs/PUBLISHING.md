@@ -1,7 +1,7 @@
 # Publishing Cartograph to PyPI
 
 The package is configured and builds clean (`twine check` passes). To publish so anyone can
-`pip install cartograph`, run these from the repo root.
+`pip install cartograph__v1`, run these from the repo root.
 
 ## Easiest: automated Trusted Publishing (no token) — recommended
 A GitHub Actions workflow (`.github/workflows/release.yml`) publishes to PyPI on every version tag,
@@ -50,7 +50,7 @@ python -m twine upload dist/*
 ```
 Then anyone can:
 ```bash
-pip install cartograph
+pip install cartograph__v1
 carto init && carto ingest ~/code && carto viz
 ```
 
