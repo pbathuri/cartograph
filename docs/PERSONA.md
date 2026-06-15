@@ -71,3 +71,20 @@ vectors, RLHF preference models, reciprocal rank fusion, online learning to rank
 - This is a heuristic, inspectable system — every weight and the preference vector are on disk and
   explainable, by design. It is not a claim of modeling "emotion" or a person's interior; it models
   *revealed preferences over your own work and fields*.
+
+## Built today vs. roadmap (honest)
+**Built + tested now:** field weights from corpus density · one global preference vector (EMA, attract
+*and* repel) · per-field confidence (data-density scaled steering) · personalized re-ranking · the
+model-agnostic steering brief · explicit output-tuning preferences · MCP `personalize` + `record_use`
+(implicit loop) · CLI + HTTP + browser-userscript surfaces · `carto demo`.
+
+**Natural next steps (not yet built — the "many complex subspaces" in full):**
+- **Per-field preference vectors** — one direction *per* field instead of a single global vector, so
+  steering is conditioned on the prompt's subspace (closest to the original Hilbert-space vision).
+- **Time decay / recency** — fade old signals so the persona tracks what you care about *now*.
+- **Learning-to-rank from the `record_use` log** — fit the blend weights (α, field vs. vector) to your
+  own accept/reject history instead of fixed constants.
+- **Cross-tool event stream** — a tiny local daemon that all surfaces write to, for true real-time sync.
+
+These are deliberately staged: the current version is simple, inspectable, and useful on day one;
+the roadmap adds power without giving up that transparency.
