@@ -1,8 +1,10 @@
 name: release
 # Publish to PyPI automatically when you push a version tag (e.g. `git tag v0.2.0 && git push --tags`).
 # Uses PyPI Trusted Publishing (OIDC) — NO API token stored in GitHub. Configure once on PyPI:
-#   pypi.org -> your project -> Publishing -> add a GitHub publisher (repo: pbathuri/cartograph,
-#   workflow: release.yml, environment: pypi).
+#   pypi.org -> add a GitHub publisher: repo `pbathuri/cartograph`, workflow `release.yml`.
+# NOTE: this workflow declares NO GitHub environment, so the PyPI publisher's "Environment name"
+# field must be LEFT BLANK for the OIDC claims to match. (If you set an env on PyPI, add the same
+# `environment: <name>` under the job below.)
 
 on:
   push:
@@ -15,7 +17,6 @@ permissions:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    environment: pypi
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

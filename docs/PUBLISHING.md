@@ -7,8 +7,9 @@ The package is configured and builds clean (`twine check` passes). To publish so
 A GitHub Actions workflow (`.github/workflows/release.yml`) publishes to PyPI on every version tag,
 with **no API token stored anywhere** (uses OIDC). One-time setup:
 1. Create the project on PyPI (first manual upload below, or a pending publisher).
-2. PyPI → your project → **Publishing** → add a **GitHub** publisher: repo `pbathuri/cartograph`,
-   workflow `release.yml`, environment `pypi`.
+2. PyPI → **Publishing** → add a **GitHub** publisher: repo `pbathuri/cartograph`,
+   workflow `release.yml`, **Environment name: leave BLANK** (the workflow declares no environment, so
+   they must match — a blank-vs-set mismatch causes a `403 OIDC token not valid for project`).
 3. Then forever after:
    ```bash
    # bump version in pyproject.toml + cartograph/__init__.py, commit, then:
