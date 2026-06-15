@@ -32,6 +32,21 @@ FIELD_TOKENS = {
     "devops": ("dockerfile", "kubernetes", "terraform", "ansible", "ci/cd", "helm"),
     "mobile": ("android", "ios", "swiftui", "kotlin", "flutter", "react native"),
     "game_dev": ("unity", "unreal", "shader", "sprite", "gameobject", "physics"),
+    # --- non-software + hardware domains, so non-dev users get real field granularity (not "general") ---
+    "embedded_hardware": ("firmware", "rtos", "microcontroller", "fpga", "verilog", "vhdl", "gpio",
+                          "i2c", "spi", "uart", "interrupt", "bare-metal", "embedded", "rtl", "soc"),
+    "finance_accounting": ("invoice", "ledger", "reconciliation", "gaap", "depreciation", "accrual",
+                           "journal entry", "accounts payable", "accounts receivable", "balance sheet",
+                           "audit", "deferred tax", "amortization", "payroll", "asc 606", "asc 740"),
+    "business_consulting": ("stakeholder", "deliverable", "engagement", "go-to-market", "operating model",
+                            "value proposition", "business case", "market sizing", "synergy", "kpi",
+                            "roadmap", "due diligence", "swot", "benchmarking"),
+    "legal": ("plaintiff", "defendant", "clause", "liability", "statute", "jurisdiction", "indemnification",
+              "counterparty", "covenant", "litigation", "compliance memo"),
+    "clinical_health": ("patient", "diagnosis", "clinical", "dosage", "symptom", "prognosis", "icd-10",
+                        "treatment plan", "cohort", "adverse event"),
+    "marketing": ("campaign", "seo", "conversion funnel", "audience segment", "brand", "copywriting",
+                  "click-through", "positioning", "messaging"),
 }
 
 

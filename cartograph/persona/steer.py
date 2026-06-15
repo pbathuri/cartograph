@@ -44,10 +44,30 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     from ..router import route
     reranker = load_reranker()                             # learned model (None until `carto train` on feedback)
     rfield = route(prompt, cfg)["field"] if reranker is not None else None
-    aff = project_affinities() if reranker is not None else {}
     _na = lambda s: "".join(c for c in (s or "").lower() if c.isalnum())  # noqa: E731
-    scored = []
+    # Affinity is CONTEXTUAL (preference for this KIND of query) when a context model exists, else global.
+    from ..context_affinity import load_context_affinity, query_vector
+    ctx = load_context_affinity() if reranker is not None else None
+    qv = query_vector(prompt, cfg) if ctx is not None else None
+    gaff = project_affinities() if reranker is not None else {}
+    ctx_on = ctx is not None and qv is not None
+
+    def _aff(nm: str) -> tuple[float, int]:                # (affinity in [-1,1], evidence count)
+        if ctx_on:
+            return ctx.lookup(qv, nm)
+        return (gaff.get(_na(nm), 0.0), 0)
+
     n = len(chunks)
+    # Confidence-scaled steering: steer hard only when affinity is strong AND well-evidenced for this
+    # query's context; gentle when unsure. Decoupled from the field-alpha (which floors for 1-domain users).
+    ctx_conf = 0.0
+    if reranker is not None:
+        for ch in chunks[:4]:
+            av, evd = _aff(ch.get("project_name"))
+            ctx_conf = max(ctx_conf, abs(av) * (min(1.0, evd / 4.0) if ctx_on else 1.0))
+    strength = (0.4 + 0.6 * steer_conf) * (0.15 + 0.85 * ctx_conf) if ctx_on else a
+    scored = []
+    cd0 = False                                             # is the TOP relevance hit confidently disliked?
     for i, ch in enumerate(chunks):
         base = 1.0 - i / n                                  # base rank, 1..0
         fld = pf.get(ch.get("project_name", ""), "general")
@@ -59,26 +79,27 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
             if cv is not None:
                 import numpy as np
                 pc = float(max(0.0, np.dot(pv, cv)))
-        if reranker is not None:                            # LEARNED reranker, RELEVANCE-GATED
-            feat = extract_features(base, fw, pc, 1.0 if fld == rfield else 0.0,
-                                    aff.get(_na(ch.get("project_name")), 0.0))
-            rr = float(reranker.proba([feat])[0])
-            # The reranker learns the user's project preference from reward, but a query-INDEPENDENT
-            # affinity must never lift a low-relevance distractor over a top-relevance hit (measured: it
-            # regressed clear queries 1.0 -> 0.44 in the test_v1 trial). RELEVANCE GATE: full influence
-            # near the top (where a preferred-but-#2 project lives), zero past rank ~3 -- it can re-order
-            # the relevant head, never pollute the tail. (Within-domain, query-CONTEXTUAL affinity is the
-            # next-gen fix; global affinity is intentionally kept conservative here so it does no harm.)
-            relgate = max(0.0, 1.0 - i / 3.0)
-            delta = rr - 0.5
-            if i == 0 and delta < 0:
-                delta = 0.0          # never demote the single most-relevant hit on global affinity alone
-                                     # (a project disliked for one query is still correct for its own)
-            score = base + a * delta * relgate
-        else:                                               # heuristic blend (hand-tuned, learned-alpha)
+        relgate = max(0.0, 1.0 - i / 3.0)                   # influence only the relevant head (rank < ~3)
+        if reranker is not None:                            # LEARNED reranker, CONTEXTUAL signal
+            av, evd = _aff(ch.get("project_name"))
+            feat = extract_features(base, fw, pc, 1.0 if fld == rfield else 0.0, av)
+            adj = strength * (float(reranker.proba([feat])[0]) - 0.5) * relgate
+            cd = ctx_on and av <= -0.4 and evd >= 2         # contextually-confident dislike FOR THIS QUERY
+        else:                                               # heuristic (field weight + subspace cosine)
             ps = 0.5 * fw + 0.5 * pc if pv is not None else fw
-            score = (1 - a) * base + a * ps
-        scored.append((score, ch))
+            adj = a * (ps - 0.5) * relgate                  # centered so it re-orders, not uniformly lifts
+            cd = False
+        if i == 0:
+            cd0 = cd
+        scored.append([base + adj, ch])
+    # TOP-HIT PROTECTION (covers reranker, heuristic, AND cold start): the most-relevant result keeps the
+    # top score UNLESS we're contextually-confident it's the wrong project for THIS kind of query. This is
+    # what makes personalization do no harm (test_v1: it stops favored projects polluting clear queries),
+    # while still letting a confidently-wrong incumbent be demoted so an ambiguous query can flip.
+    if scored and not cd0:
+        top_other = max((s for s, _ in scored[1:]), default=scored[0][0])
+        if scored[0][0] < top_other:
+            scored[0][0] = top_other + 1e-6
     scored.sort(key=lambda t: t[0], reverse=True)
     out_chunks = [c for _, c in scored][:top_k]
     projects: list[str] = []

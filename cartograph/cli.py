@@ -219,6 +219,13 @@ def train() -> None:
         console.print("[green]✓ router trained[/green] on " + ", ".join(f"{k}({v})" for k, v in counts.items()))
     else:
         console.print("[yellow]no field-labeled chunks[/yellow] for the router — run carto ingest (declare --field).")
+    # contextual affinity: cluster the feedback queries so preference is per query-context (must be built
+    # BEFORE the reranker, which consumes it as a feature). Quietly skips without enough feedback.
+    from .context_affinity import build_contexts
+    crep = build_contexts(load_config())
+    if crep.get("trained"):
+        console.print(f"[green]✓ contextual affinity[/green]: {crep['clusters']} query-contexts "
+                      f"from {crep['events']} events {crep['cluster_sizes']}")
     # learned reranker from the feedback log (self-improving; activates once enough signals exist)
     from .rerank_model import train_from_log
     from .persona.profile import load_persona

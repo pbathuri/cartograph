@@ -137,6 +137,8 @@ def train_from_log(store, cfg: Config, persona, *, min_examples: int = 12) -> di
     norm = _norm
     vecs = persona._load_all()
     aff = project_affinities()
+    from .context_affinity import load_context_affinity, query_vector
+    ctx = load_context_affinity()                          # contextual affinity (built before training)
     X, Y = [], []
     events = 0
     for line in log.read_text(encoding="utf-8").splitlines():
@@ -154,6 +156,7 @@ def train_from_log(store, cfg: Config, persona, *, min_examples: int = 12) -> di
         if not chunks:
             continue
         rfield = route(ev["query"], cfg)["field"]
+        qv = query_vector(ev["query"], cfg) if ctx is not None else None
         names = list({c.get("project_name") for c in chunks if c.get("project_name")})
         ph = ",".join("?" * len(names)) if names else ""
         pf = {}
@@ -177,7 +180,9 @@ def train_from_log(store, cfg: Config, persona, *, min_examples: int = 12) -> di
                     cv = _model(cfg.embed_model).encode([DOC_PREFIX + (ch.get("chunk_text") or "")[:600]],
                                                         normalize_embeddings=True)[0]
                     pc = float(max(0.0, np.dot(v, cv)))
-            X.append(extract_features(1 - i / n, fw, pc, 1.0 if fld == rfield else 0.0, aff.get(nm, 0.0)))
+            caff = ctx.lookup(qv, ch.get("project_name"))[0] if (ctx is not None and qv is not None) \
+                else aff.get(nm, 0.0)                       # contextual affinity (train == serve)
+            X.append(extract_features(1 - i / n, fw, pc, 1.0 if fld == rfield else 0.0, caff))
             Y.append(label)
     if len(Y) < min_examples or len(set(Y)) < 2:
         return {"trained": False, "reason": f"need >= {min_examples} labeled candidates of both classes "
