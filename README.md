@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/graph.svg" alt="Cartograph — your work mapped into one graph, plugged into your AI agents" width="100%" />
+<img src="docs/assets/graph.gif" alt="Cartograph — your work mapped into one graph, plugged into your AI agents" width="100%" />
 
 <p align="center"><em>Your AI agents are brilliant — and amnesiac. <strong>Cartograph gives them your memory.</strong></em></p>
 
