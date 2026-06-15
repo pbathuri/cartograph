@@ -44,3 +44,6 @@ Documentation = "https://github.com/pbathuri/cartograph#readme"
 
 [tool.setuptools.packages.find]
 include = ["cartograph*"]
+
+[tool.setuptools.package-data]
+"cartograph.viz" = ["*.html"]
