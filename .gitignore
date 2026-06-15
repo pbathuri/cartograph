@@ -1,0 +1,34 @@
+# Cartograph keeps ALL user data out of git by default. Your graph is yours.
+.cartograph/
+*.sqlite
+*.sqlite-*
+*.db
+index/
+*.npy
+*.npz
+*.pt
+*.pth
+embeddings/
+generated/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local config (users copy config/cartograph.example.yaml -> ~/.cartograph/config.yaml)
+config/cartograph.yaml
+*.local.yaml
