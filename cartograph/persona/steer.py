@@ -38,18 +38,19 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     # confidence in steering grows with how much we know about the user
     steer_conf = min(1.0, persona.n_signals / 20.0) if persona.n_signals else (0.3 if persona.field_weights else 0.0)
     a = alpha * (0.4 + 0.6 * steer_conf)
-    pref_vec = persona.load_vector()
+    vecs = persona._load_all()                              # per-field subspace vectors + _global
     scored = []
     n = len(chunks)
     for i, ch in enumerate(chunks):
         base = 1.0 - i / n                                  # base rank, 1..0
         fld = pf.get(ch.get("project_name", ""), "general")
         ps = persona.field_weights.get(fld, 0.0)            # field-weight component (always on)
-        if pref_vec is not None:
+        pv = vecs.get(fld) if fld in vecs else vecs.get("_global")  # score IN the chunk's subspace
+        if pv is not None:
             cv = _chunk_vec(ch, cfg)
             if cv is not None:
                 import numpy as np
-                ps = 0.5 * ps + 0.5 * float(max(0.0, np.dot(pref_vec, cv)))
+                ps = 0.5 * ps + 0.5 * float(max(0.0, np.dot(pv, cv)))
         scored.append(((1 - a) * base + a * ps, ch))
     scored.sort(key=lambda t: t[0], reverse=True)
     out_chunks = [c for _, c in scored][:top_k]
