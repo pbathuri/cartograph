@@ -16,7 +16,6 @@ Features per candidate (computed identically at train + serve):
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from .config import Config, home
 

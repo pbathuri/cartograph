@@ -60,7 +60,6 @@ def _name_cluster(names: list[str]) -> str:
 
 def learn_fields(store: Store, cfg: Config, *, only_general: bool = True, min_projects: int = 4) -> dict:
     """Cluster project embeddings and relabel `general` projects with their learned field. Returns a report."""
-    import numpy as np
     from .context_affinity import _kmeans
     means, order = _project_vectors(store, cfg)
     if means is None:

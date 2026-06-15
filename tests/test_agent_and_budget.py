@@ -1,5 +1,4 @@
 """agent-setup output + token-budgeted steering brief."""
-from pathlib import Path
 
 from typer.testing import CliRunner
 

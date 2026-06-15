@@ -6,6 +6,16 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check cartograph tests
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -20,7 +30,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install (core + dev)
         run: pip install -e ".[dev]"
-      - name: Smoke tests (pure-FTS path — no heavy ML)
+      - name: Tests (no sentence-transformers; semantic-only tests skip automatically)
         run: python -m pytest tests -q
       - name: Package builds + checks
         run: |

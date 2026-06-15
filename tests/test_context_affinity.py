@@ -3,7 +3,6 @@ project can be liked in one context and disliked in another. Also covers broaden
 import json
 
 import numpy as np
-import pytest
 
 from cartograph import context_affinity as CA
 

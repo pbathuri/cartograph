@@ -5,7 +5,6 @@ if `cartograph[semantic]` isn't installed, so the base product works without it.
 Brute-force is fine to a few million chunks (~150ms/query). Past that, swap in FAISS — see docs."""
 from __future__ import annotations
 
-from pathlib import Path
 
 from .config import Config, index_dir
 from .storage import Store

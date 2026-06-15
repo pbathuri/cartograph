@@ -66,7 +66,8 @@ def test_full_pipeline_connectivity(tmp_path, monkeypatch):
     assert build_centroids(store, cfg)                         # router trained from corpus
     assert build_contexts(cfg)["trained"]                      # contextual affinity from the feedback log
     assert train_from_log(store, cfg, load_persona(store))["trained"]  # reranker from log + contexts
-    reset_cache(); rctx()
+    reset_cache()
+    rctx()
 
     # 6. personalize brief — the integration point every agent consumes
     brief = build_brief("reconcile the ledger at month end", store, cfg, load_persona(store))

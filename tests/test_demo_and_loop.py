@@ -3,7 +3,6 @@ import json
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 from cartograph.config import Config
 from cartograph.demo import write_corpus

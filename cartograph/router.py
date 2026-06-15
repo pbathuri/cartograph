@@ -9,7 +9,6 @@ the workspace. Degrades to keyword matching when embeddings aren't installed or 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from .config import Config, home
 from .elite.catalog import match_field

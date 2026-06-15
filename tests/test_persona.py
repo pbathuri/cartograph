@@ -59,7 +59,7 @@ def test_build_brief_shape(graph):
 
 
 def test_bidirectional_feedback_moves_weight_down(graph):
-    from cartograph.persona.profile import PersonaProfile, save_persona
+    from cartograph.persona.profile import PersonaProfile
     # ml_project ingests as ml_experiment (declared focus); disliking it pulls ml_experiment down.
     p = PersonaProfile(field_weights={"ml_experiment": 0.6, "web_frontend": 0.4})
     save_persona(p)
@@ -71,7 +71,6 @@ def test_bidirectional_feedback_moves_weight_down(graph):
 def test_prefs_flow_into_brief(graph):
     p = load_persona(graph)
     p.preferences = {"verbosity": "concise", "format": "bullets"}
-    from cartograph.persona.profile import save_persona
     save_persona(p)
     b = build_brief("how do I train a model", graph, Config(), load_persona(graph))
     assert b["preferences"]["verbosity"] == "concise"
@@ -104,7 +103,7 @@ def test_per_field_subspaces_form(tmp_path, monkeypatch):
 
 
 def test_learned_alpha_rises_on_predicted_hits_falls_on_misses(graph):
-    from cartograph.persona.profile import PersonaProfile, save_persona
+    from cartograph.persona.profile import PersonaProfile
     # persona already emphasizes ml_experiment; liking an ml project = predicted hit -> alpha up
     p = PersonaProfile(field_weights={"ml_experiment": 0.9, "web_frontend": 0.1}, learned_alpha=0.35)
     save_persona(p)

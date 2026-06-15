@@ -40,7 +40,7 @@ secure = ["cryptography>=42.0"]
 # Everything.
 full = ["sentence-transformers>=2.6", "torch>=2.0", "scikit-learn>=1.3", "numpy>=1.24", "einops>=0.7",
         "mss>=9.0", "pillow>=10.0", "pytesseract>=0.3.10", "cryptography>=42.0"]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "numpy>=1.24", "ruff>=0.6"]  # numpy: unit tests for learned models; ruff: lint
 
 [project.scripts]
 carto = "cartograph.cli:app"
@@ -48,6 +48,14 @@ carto = "cartograph.cli:app"
 [project.urls]
 Homepage = "https://github.com/pbathuri/cartograph"
 Documentation = "https://github.com/pbathuri/cartograph#readme"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# E402 in cli.py is intentional: stdout/stderr must be reconfigured to UTF-8 (Windows) before other imports.
+per-file-ignores = { "cartograph/cli.py" = ["E402"] }
 
 [tool.setuptools.packages.find]
 include = ["cartograph*"]

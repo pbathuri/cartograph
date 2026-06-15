@@ -25,7 +25,7 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 from . import __version__
-from .config import Config, db_path, home, index_dir, load_config, save_config
+from .config import db_path, home, index_dir, load_config, save_config
 from .storage import Store
 
 app = typer.Typer(add_completion=False, help="Cartograph — your personal cognitive graph for AI work.")
@@ -227,7 +227,8 @@ def train() -> None:
     if lf.get("learned"):
         console.print(f"[green]✓ learned fields[/green]: {lf['clusters']} clusters over {lf['projects']} "
                       f"unfielded projects → {sorted(set(lf['fields'].values()))}")
-        old = _lp(_store(read_only=True)); fresh = build_from_corpus(_store(read_only=True))
+        old = _lp(_store(read_only=True))
+        fresh = build_from_corpus(_store(read_only=True))
         old.field_weights = fresh.field_weights                # refresh weights for the learned fields...
         for k, v in fresh.confidence.items():
             old.confidence.setdefault(k, v)
