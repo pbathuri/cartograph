@@ -88,7 +88,11 @@ def build_contexts(cfg: Config, *, min_events: int = 8) -> dict:
     if any(v is None for v in vecs):
         return {"trained": False, "reason": "embeddings unavailable (semantic extra needed)"}
     X = np.vstack(vecs).astype("float32")
-    k = max(2, min(8, round(len(set(ev["query"] for ev in events)) ** 0.5)))
+    # Finer than sqrt: distinct query INTENTS are the contexts, and two similar-sounding queries can have
+    # OPPOSITE preferences (e.g. "size the market opportunity" vs "prioritize growth initiatives"). Too few
+    # clusters conflates them; the (pos-neg)/(pos+neg+1) shrinkage keeps sparse clusters safe.
+    n_unique = len(set(ev["query"] for ev in events))
+    k = max(2, min(16, round(n_unique * 0.7)))
     k = min(k, len(X))
     C, assign = _kmeans(X, k)
     pos = [collections.Counter() for _ in range(k)]

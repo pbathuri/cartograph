@@ -66,6 +66,14 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
             av, evd = _aff(ch.get("project_name"))
             ctx_conf = max(ctx_conf, abs(av) * (min(1.0, evd / 4.0) if ctx_on else 1.0))
     strength = (0.4 + 0.6 * steer_conf) * (0.15 + 0.85 * ctx_conf) if ctx_on else a
+    # PROJECT-rank (not chunk-rank) gate: a preferred project must be promotable even when a rival's many
+    # chunks fill the chunk head. Rank by first appearance among DISTINCT projects. (Chunk-rank gating
+    # silently blocked promotion for multi-file projects — found in the compeng trial.)
+    proj_rank: dict[str, int] = {}
+    for ch in chunks:
+        nm = ch.get("project_name")
+        if nm and nm not in proj_rank:
+            proj_rank[nm] = len(proj_rank)
     scored = []
     cd0 = False                                             # is the TOP relevance hit confidently disliked?
     for i, ch in enumerate(chunks):
@@ -79,7 +87,8 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
             if cv is not None:
                 import numpy as np
                 pc = float(max(0.0, np.dot(pv, cv)))
-        relgate = max(0.0, 1.0 - i / 3.0)                   # influence only the relevant head (rank < ~3)
+        pr = proj_rank.get(ch.get("project_name"), 99)
+        relgate = max(0.0, 1.0 - pr / 2.0)                  # influence only the top ~2 distinct projects
         if reranker is not None:                            # LEARNED reranker, CONTEXTUAL signal
             av, evd = _aff(ch.get("project_name"))
             feat = extract_features(base, fw, pc, 1.0 if fld == rfield else 0.0, av)
