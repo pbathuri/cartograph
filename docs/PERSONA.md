@@ -112,9 +112,20 @@ trained on your own data** — no fixed heuristics where learning is possible:
    your own history (it's a personal recommender — `proj_affinity` intentionally encodes standing
    preferences), not a held-out generalization claim. Stale models (feature-schema change) are ignored,
    never crash serving.
+5. **Query-contextual affinity** (`carto train`) — preference conditioned on the *kind* of query. We
+   cluster your feedback queries by embedding and learn project affinity *per cluster*, so a project can
+   be disliked for one kind of query and preferred for another (e.g. "payroll" is poor for "reconcile the
+   account" but correct for "Form 941 payroll"). A single global affinity can't express that — it cancels
+   to ~0. Wired through the reranker (train == serve) and a relevance-gated, top-hit-protected blend so it
+   never lifts a low-relevance project over the genuine top hit. **Validated to generalize**: it scores
+   1.00 on *unseen paraphrases* (vs 0.70 plain retrieval) in `docs/SELF_AUDIT.md`.
+6. **Learned fields** (`carto fields`) — for users whose vocabulary the keyword field-inference misses
+   (most non-dev domains collapse to `general`), cluster the corpus's own embeddings into emergent fields
+   (`auto:<keyword>`) so field weights + subspaces work for *any* domain, no keyword list.
 
-So the layer is **agnostic on three axes** — field (router), use-case (intent), and your revealed
-preferences (subspaces + reranker) — and each axis is learned from *you*.
+So the layer is **agnostic on three axes** — field (router + learned fields), use-case (intent), and your
+revealed preferences (subspaces + reranker + query-contextual affinity) — each learned from *you*.
+See `docs/V1_TRIAL.md`, `docs/AUDIT_DUAL_USERS.md`, and `docs/SELF_AUDIT.md` for the trials behind these.
 
 ### The real-time vision layer (`carto watch`) — one core builder of data
 The graph stops being a one-time ingest and becomes a **living stream**. A background loop periodically

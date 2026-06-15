@@ -4,7 +4,8 @@ I stress-tested my own recent design choices: an **ablation** of each personaliz
 **held-out generalization** test (the shortcoming I'd flagged: gains measured on the same queries used
 for feedback), and a **hyperparameter sweep**. Run on the *finance consultant* world — the hardest case,
 where field inference fully collapses to `general`, so only the query-contextual mechanism can help.
-Harness: `test_v1/ablation.py` (steering knobs exposed via `personalized_retrieve(..., tuning=...)`).
+(Run on an internal ablation harness; the knobs it sweeps are exposed in-product via
+`personalized_retrieve(..., tuning=...)`, so the configuration surface is real and reproducible.)
 
 ## Held-out generalization + component ablation
 Trained on `AMBIG_TRAIN` queries; `AMBIG_heldout` are **unseen paraphrases** (same intent/preferred

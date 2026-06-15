@@ -2,8 +2,8 @@
 
 To decide whether V1 *actually works* (not just runs), I ran a full lifecycle on a synthetic but
 realistic user and measured retrieval quality with ground truth. This records what worked, what didn't,
-and the fix that shipped. Harness + data: `test_v1/` (git-ignored; regenerate with `gen_corpus.py` +
-`simulate_month.py`).
+and the fix that shipped. (Run on an internal, synthetic-data eval harness kept out of the public
+package — all data is generated, no real user data.)
 
 ## Setup
 - **User:** Dana Okafor, Senior Accountant at *Meridian Logistics Inc.* — 10 work areas as folders

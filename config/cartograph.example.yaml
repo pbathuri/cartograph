@@ -1,0 +1,30 @@
+# Cartograph configuration — copy to ~/.cartograph/config.yaml (or $CARTOGRAPH_HOME/config.yaml).
+# `carto init` writes this for you; edit it any time. Everything is local to your machine.
+
+# Folders to ingest (your repos, notes, docs). Absolute paths or ~ are fine.
+roots:
+  - ~/code
+  - ~/notes
+
+# Your domains (optional). Declaring them makes field steering sharp from day one; leave empty to let
+# Cartograph infer fields from your corpus (and learn emergent fields via `carto fields` for any vocabulary).
+field_focus: []
+#   - ml_experiment
+#   - finance_accounting
+
+# Directories/files to skip during ingestion.
+ignore:
+  - .git
+  - node_modules
+  - .venv
+  - venv
+  - __pycache__
+  - dist
+  - build
+  - site-packages
+
+# Skip files larger than this (MB) — keeps the graph lean.
+max_file_mb: 2.0
+
+# Embedding model for the optional semantic layer (needs `cartograph__v1[semantic]`). CPU or CUDA auto.
+embed_model: nomic-ai/nomic-embed-text-v1.5

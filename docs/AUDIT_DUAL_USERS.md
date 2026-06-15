@@ -9,7 +9,8 @@ Two simulated users, each with a 12-project corpus (111 files), full lifecycle (
 days of feedback → weekly retrain). For each: **regular** workflow (plain hybrid retrieval, no persona)
 vs **backed** workflow (Cartograph personalization), at a **short-term** (day 3, sparse feedback) and
 **long-term** (day 60) horizon. CLEAR queries = no-regression check; AMBIG queries = engineered so the
-rival project leads base retrieval, so personalization has real work to do. Harness: `test_v1/dual_trial.py`.
+rival project leads base retrieval, so personalization has real work to do. (Run on an internal,
+synthetic-data eval harness kept out of the public package; results below.)
 
 ## Results (MRR of the correct/preferred project)
 | User | | regular | backed short | backed long |
