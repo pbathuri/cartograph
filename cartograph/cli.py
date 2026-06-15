@@ -414,6 +414,30 @@ def serve(port: int = typer.Option(8787, "--port")) -> None:
     launch(port=port, open_browser=False)
 
 
+@app.command()
+def studio(port: int = typer.Option(8787, "--port"), no_open: bool = typer.Option(False, "--no-open")) -> None:
+    """Launch the visual Studio: see + edit your workflow (add/connect/import nodes), with the core
+    locked behind disclaimers, a stats window, node details, and a graph chat. Non-technical friendly."""
+    from .viz.app import launch
+    console.print(f"[bold]Cartograph Studio[/bold] on http://127.0.0.1:{port}/studio "
+                  "[dim](local-only; mutations require the workspace token, injected into the page)[/dim]")
+    launch(port=port, open_browser=not no_open, path="/studio")
+
+
+@app.command()
+def secure() -> None:
+    """Show the security posture of this workspace (token, encryption, file perms) — V1 hardening."""
+    from .security import _key_path, _token_path, api_token, encryption_available
+    api_token()                                          # ensure it exists
+    console.print("[bold]security[/bold]")
+    console.print(f"  api token   : present \\[{_token_path()}] — required for Studio mutations")
+    console.print(f"  encryption  : {'available' if encryption_available() else 'off'} "
+                  + ("" if encryption_available() else r"(pip install 'cartograph__v1\[secure]' for at-rest encryption)"))
+    console.print(f"  enc key     : {'present' if _key_path().exists() else 'not created (used only if you enable encrypt_at_rest)'}")
+    console.print("  server      : binds 127.0.0.1 only · CORS allowlist (no '*') · DNS-rebinding Host check")
+    console.print("  vision      : sensitive windows skipped · secrets redacted pre-storage · opt-in encrypt-at-rest")
+
+
 _AGENT_RULE = (
     "At the START of every task, call the Cartograph MCP tool `personalize` with the user's request; "
     "follow its `output_guidance` and prefer the user's own patterns in `relevant_context`. For grounding "

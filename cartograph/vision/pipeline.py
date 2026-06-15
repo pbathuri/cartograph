@@ -39,16 +39,21 @@ class VisionConfig:
     redact: bool = True
     learn_persona: bool = True          # let observed activity gently shape persona field weights
     max_chars: int = 4000               # cap stored text per frame
+    encrypt_at_rest: bool = False       # privacy-max: encrypt stored screen text (disables FTS over it)
 
 
 def _today_path() -> str:
     return "screen://" + _dt.date.today().isoformat()
 
 
-def _ingest(store: Store, text: str, field: str, intent: str, app: str) -> int:
-    """Append one screen chunk under the daily 'file' of the screen-activity project. Returns chunk count."""
+def _ingest(store: Store, text: str, field: str, intent: str, app: str, *, encrypt: bool = False) -> int:
+    """Append one screen chunk under the daily 'file' of the screen-activity project. Returns chunk count.
+    With `encrypt`, the body is Fernet-encrypted at rest (metadata header stays clear for classification)."""
     pid = store.upsert_project(PROJECT_NAME, "(live screen capture)", PROJECT_FIELD)
     fid = store.ensure_file(pid, _today_path(), ext="screen")
+    if encrypt:
+        from ..security import encrypt_text
+        text = encrypt_text(text)
     header = f"[screen field={field} intent={intent} app={app}]"
     return store.add_chunks(fid, [header + "\n" + text])
 
@@ -96,7 +101,7 @@ def process_frame(frame, store: Store, cfg: Config, vcfg: VisionConfig, gate: No
     rec = {"action": "store" if apply else "preview", "app": app, "field": field, "intent": intent,
            "chars": len(clean), "redacted": nred, "preview": clean[:160]}
     if apply:
-        _ingest(store, clean, field, intent, app)
+        _ingest(store, clean, field, intent, app, encrypt=vcfg.encrypt_at_rest)
         if vcfg.learn_persona and persona is not None:
             from ..persona.profile import save_persona
             _nudge_persona(persona, field)
@@ -113,6 +118,9 @@ def recent_activity(store: Store, *, limit: int = 3) -> list[dict]:
     for ch in store.recent_chunks(pid, limit=limit):
         txt = ch.get("chunk_text") or ""
         meta, _, body = txt.partition("\n")
+        if body.startswith("ENC1:"):                       # decrypt screen text stored privacy-max
+            from ..security import decrypt_text
+            body = decrypt_text(body)
         m = _HEADER_RE.match(meta)                         # app may contain spaces -> regex, not split
         info = {"app": (m.group("app").strip() if m else ""),
                 "field": (m.group("field") if m else ""),

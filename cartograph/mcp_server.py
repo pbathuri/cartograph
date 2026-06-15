@@ -63,8 +63,9 @@ def _handle(req: dict) -> str | None:
     rid = req.get("id")
 
     if method == "initialize":
+        from . import __version__
         return _resp(rid, {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}},
-                           "serverInfo": {"name": "cartograph", "version": "0.1.0"}})
+                           "serverInfo": {"name": "cartograph", "version": __version__}})
     if method in ("notifications/initialized",):
         return None
     if method == "tools/list":

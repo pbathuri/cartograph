@@ -1,0 +1,268 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cartograph Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* Utilitarian, not decorative: high-contrast, dense, fast. No animations that slow navigation. */
+  :root { --bg:#0f1217; --panel:#171b22; --line:#2a313c; --ink:#e6e9ef; --dim:#8a93a3;
+          --accent:#4da3ff; --lock:#e0a23c; --ok:#48c78e; --warn:#f06a6a;
+          --src:#5b8def; --model:#a472e8; --transform:#3fb6a8; --output:#e0883c; --custom:#7f8a9b; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+              font:13px/1.45 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif; }
+  #app { display:grid; grid-template-columns:230px 1fr 320px; grid-template-rows:42px 1fr; height:100vh; }
+  header { grid-column:1/4; display:flex; align-items:center; gap:12px; padding:0 12px;
+           background:var(--panel); border-bottom:1px solid var(--line); }
+  header b { font-size:14px; } header .sp { flex:1; }
+  button { background:#222934; color:var(--ink); border:1px solid var(--line); border-radius:5px;
+           padding:5px 10px; cursor:pointer; font-size:12px; } button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#04121f; font-weight:600; }
+  aside,#right { background:var(--panel); overflow:auto; }
+  aside { border-right:1px solid var(--line); padding:10px; } #right { border-left:1px solid var(--line); }
+  h3 { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:14px 8px 6px; }
+  .gitem { padding:8px; border:1px solid var(--line); border-radius:6px; margin:6px 0; cursor:pointer; }
+  .gitem:hover, .gitem.on { border-color:var(--accent); }
+  .gitem .t { font-weight:600; } .gitem .d { color:var(--dim); font-size:12px; margin-top:3px; }
+  #canvas { position:relative; overflow:hidden; } svg { width:100%; height:100%; display:block; }
+  .node rect { rx:7; stroke:var(--line); stroke-width:1.5; }
+  .node.sel rect { stroke:var(--accent); stroke-width:2.5; }
+  .node.disabled { opacity:.4; } .node text { fill:#06101c; font-weight:600; pointer-events:none; }
+  .node .sub { fill:#06101c; opacity:.7; font-weight:400; font-size:10px; }
+  .lockbadge { fill:var(--lock); } .edge { stroke:#43506a; stroke-width:1.6; } .edge.locked { stroke:#566; stroke-dasharray:none; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); }
+  .tabs div { flex:1; text-align:center; padding:9px; cursor:pointer; color:var(--dim); }
+  .tabs div.on { color:var(--ink); border-bottom:2px solid var(--accent); }
+  .pane { padding:12px; display:none; } .pane.on { display:block; }
+  .row { margin:8px 0; } label.f { display:block; color:var(--dim); font-size:11px; margin-bottom:3px; }
+  input,textarea { width:100%; background:#0e1218; color:var(--ink); border:1px solid var(--line);
+                   border-radius:5px; padding:6px; font-size:12px; }
+  .kv { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid #1f2630; }
+  .kv span:first-child { color:var(--dim); } .pill { font-size:10px; padding:1px 6px; border-radius:9px; }
+  .lockbox { background:#3a2f17; border:1px solid var(--lock); border-radius:6px; padding:9px; margin:8px 0; color:#f3d9a6; }
+  .desc { color:#c4ccd8; } .muted { color:var(--dim); }
+  #chatlog { height:300px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:8px; }
+  .msg { margin:6px 0; } .msg.u { color:var(--accent); } .msg.b { color:#cdd5e0; }
+  #modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; }
+  #modal .box { background:var(--panel); border:1px solid var(--lock); border-radius:10px; max-width:440px; padding:18px; }
+  #modal h2 { margin:0 0 8px; font-size:15px; color:var(--lock); } #toast { position:fixed; bottom:14px; left:50%;
+    transform:translateX(-50%); background:#222934; border:1px solid var(--line); padding:8px 14px; border-radius:6px; display:none; }
+</style>
+
+<div id="app">
+  <header>
+    <b>Cartograph Studio</b>
+    <span class="muted" id="wfval">·</span>
+    <span class="sp"></span>
+    <button onclick="addNode()">+ Node</button>
+    <button onclick="connectMode()" id="connbtn">Connect</button>
+    <button onclick="load()">Refresh</button>
+    <a href="/index.html" target="_blank"><button>Graph view ↗</button></a>
+  </header>
+
+  <aside>
+    <h3>Graphs &amp; workflows</h3>
+    <div id="graphs"></div>
+    <h3>Legend</h3>
+    <div class="muted" style="padding:0 8px">
+      <div>🔒 locked core — click to see why</div>
+      <div style="margin-top:4px">● source ● model ● transform ● output ● custom</div>
+    </div>
+  </aside>
+
+  <div id="canvas"><svg id="svg"></svg></div>
+
+  <div id="right">
+    <div class="tabs">
+      <div class="on" data-t="details" onclick="tab('details')">Details</div>
+      <div data-t="stats" onclick="tab('stats')">Stats</div>
+      <div data-t="import" onclick="tab('import')">Import</div>
+      <div data-t="chat" onclick="tab('chat')">Chat</div>
+    </div>
+
+    <div class="pane on" id="p-details"><p class="muted">Select a node to see what it does.</p></div>
+
+    <div class="pane" id="p-stats">
+      <button onclick="loadStats(false,false)">Simple</button>
+      <button onclick="loadStats(true,false)">Advanced ▾</button>
+      <button onclick="loadStats(true,true)" title="Times retrieval + brief; warms the embedding model">Deep insights</button>
+      <div id="statsbody" style="margin-top:10px"></div>
+    </div>
+
+    <div class="pane" id="p-import">
+      <p class="muted">Plug in a model/LLM/repo. It appears as a <b>hovering node</b> — then use Connect
+        to wire it between two nodes.</p>
+      <div class="row"><label class="f">Name</label><input id="m-name" placeholder="my-reranker"></div>
+      <div class="row"><label class="f">Source (path / URL / HF id)</label>
+        <input id="m-src" placeholder="./models/rr.pt  or  hf:org/model  or  https://…"></div>
+      <div class="row"><label class="f">Kind</label>
+        <select id="m-kind" style="width:100%;background:#0e1218;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:6px">
+          <option value="model">ML model</option><option value="llm">LLM</option>
+          <option value="repo">Repo</option><option value="context">Context</option></select></div>
+      <button class="primary" onclick="importModel()">Import as hovering node</button>
+    </div>
+
+    <div class="pane" id="p-chat">
+      <div class="lockbox" id="llmnote">No LLM connected. Built-in commands work now (e.g. <i>add node X</i>,
+        <i>import model NAME from SRC</i>, <i>connect A to B</i>, <i>details ID</i>, <i>stats</i>).
+        Connecting a local/cloud LLM is opt-in and will show a privacy disclaimer first.</div>
+      <div id="chatlog"></div>
+      <div class="row" style="display:flex;gap:6px">
+        <input id="chatin" placeholder="Tell the graph what to do…" onkeydown="if(event.key==='Enter')chat()">
+        <button class="primary" onclick="chat()">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal"><div class="box"><h2>🔒 Core node — locked</h2><p id="modaltext"></p>
+  <p class="muted" id="modalhint"></p><div style="text-align:right"><button onclick="closeModal()">I understand</button></div></div></div>
+<div id="toast"></div>
+
+<script>
+const TOKEN = "__CARTO_TOKEN__";
+const KCOLOR = {source:'--src',model:'--model',transform:'--transform',output:'--output',io:'--transform',custom:'--custom',llm:'--model',repo:'--custom',context:'--custom'};
+let WF = {nodes:[], edges:[]}, SEL = null, CONN = null;
+const svg = document.getElementById('svg');
+const $ = id => document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2200); }
+function cssvar(v){ return getComputedStyle(document.documentElement).getPropertyValue(v); }
+
+async function api(path){ try{ return await (await fetch(path)).json(); }catch(e){ toast('read failed'); return {}; } }
+async function post(path, body){
+  try{ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Carto-Token':TOKEN},
+       body:JSON.stringify(body||{})}); const j=await r.json(); if(r.status===423){ showModal(j); return j; } return j; }
+  catch(e){ toast('action failed'); return {ok:false}; }
+}
+
+async function load(){
+  WF = await api('/api/workflow'); render();
+  const v = await api('/api/stats'); // cheap validate-ish
+  const g = await api('/api/graphs'); renderGraphs(g.graphs||[]);
+}
+function renderGraphs(gs){
+  $('graphs').innerHTML = gs.map(g=>`<div class="gitem" onclick='showGraph(${JSON.stringify(g).replace(/'/g,"&#39;")})'>
+    <div class="t">${esc(g.label)}</div><div class="d">${esc(g.desc)}</div></div>`).join('');
+}
+function showGraph(g){
+  tab('details');
+  $('p-details').innerHTML = `<h2 style="font-size:15px;margin:4px 0">${esc(g.label)}</h2>
+    <p class="desc">${esc(g.desc)}</p><div class="lockbox" style="background:#13202b;border-color:var(--accent);color:#bfe0ff">
+    <b>How it connects</b><br>${esc(g.connects)}</div>`;
+}
+function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function nodeById(id){ return WF.nodes.find(n=>n.id===id); }
+function render(){
+  const W = svg.clientWidth||900, H=svg.clientHeight||600;
+  let s = '';
+  for(const e of WF.edges){ const a=nodeById(e.from),b=nodeById(e.to); if(!a||!b)continue;
+    const [x1,y1]=center(a),[x2,y2]=center(b);
+    s += `<line class="edge ${e.locked?'locked':''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`; }
+  for(const n of WF.nodes){
+    const [x,y]=n.pos, col=cssvar(KCOLOR[n.kind]||'--custom');
+    const lock = n.locked? `<text class="lockbadge" x="${x+150}" y="${y+19}" font-size="13">🔒</text>`:'';
+    const hov = n.hovering? `<text class="sub" x="${x+10}" y="${y+44}">hovering — connect me</text>`:'';
+    s += `<g class="node ${SEL===n.id?'sel':''} ${n.disabled?'disabled':''}" data-id="${n.id}" transform="translate(0,0)">
+      <rect x="${x}" y="${y}" width="170" height="${n.hovering?52:38}" fill="${col}"></rect>
+      <text x="${x+10}" y="${y+24}" font-size="12">${esc(n.label)}</text>${lock}${hov}</g>`;
+  }
+  svg.innerHTML = s; wireDrag();
+}
+function center(n){ return [n.pos[0]+85, n.pos[1]+19]; }
+
+function wireDrag(){
+  svg.querySelectorAll('.node').forEach(g=>{
+    g.addEventListener('mousedown', e=>{
+      const id=g.dataset.id, n=nodeById(id); if(!n)return;
+      if(CONN){ if(CONN!==id){ doConnect(CONN,id); } CONN=null; $('connbtn').classList.remove('primary'); return; }
+      selectNode(id);
+      const sx=e.clientX, sy=e.clientY, ox=n.pos[0], oy=n.pos[1]; let moved=false;
+      const mv=ev=>{ moved=true; n.pos=[ox+(ev.clientX-sx), oy+(ev.clientY-sy)]; render(); };
+      const up=ev=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+        if(moved) post('/api/workflow/position',{id,x:n.pos[0],y:n.pos[1]}); };
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
+  });
+}
+
+async function selectNode(id){
+  SEL=id; render(); tab('details');
+  const d = await api('/api/node?id='+encodeURIComponent(id));
+  if(!d.ok){ $('p-details').innerHTML='<p class="muted">No details.</p>'; return; }
+  const lock = d.locked? `<div class="lockbox"><b>🔒 Locked core node.</b><br>${esc(d.reason)}</div>`:'';
+  const opt = d.optional && !d.locked;
+  const delLabel = d.locked? 'Delete (locked)' : (d.system? 'Disable' : 'Delete');
+  $('p-details').innerHTML = `
+    <h2 style="font-size:15px;margin:4px 0">${esc(d.label)}</h2>
+    <div class="kv"><span>kind</span><span>${esc(d.kind)}</span></div>
+    <div class="kv"><span>type</span><span>${d.system?'system':'custom'}${opt?' · optional':''}</span></div>
+    ${d.source?`<div class="kv"><span>source</span><span>${esc(d.source)}</span></div>`:''}
+    <p class="desc" style="margin-top:8px">${esc(d.description)}</p>${lock}
+    <div class="kv"><span>inputs</span><span>${(d.incoming||[]).join(', ')||'—'}</span></div>
+    <div class="kv"><span>outputs</span><span>${(d.outgoing||[]).join(', ')||'—'}</span></div>
+    <div class="row" style="display:flex;gap:6px;margin-top:10px">
+      <button onclick="delNode('${id}')">${delLabel}</button>
+      ${d.disabled?`<button class="primary" onclick="enableNode('${id}')">Enable</button>`:''}
+      <button onclick="startConnect('${id}')">Connect from here</button>
+    </div>`;
+}
+
+async function delNode(id){
+  const n=nodeById(id);
+  const r = await post('/api/workflow/delete',{id});
+  if(r.locked){ return; }            // modal already shown
+  toast(r.disabled?'disabled':'deleted'); load();
+}
+async function enableNode(id){ await post('/api/workflow/enable',{id}); toast('enabled'); load(); }
+function startConnect(id){ CONN=id; $('connbtn').classList.add('primary'); toast('Now click the target node'); }
+function connectMode(){ if(SEL){ startConnect(SEL); } else toast('Select a source node first'); }
+async function doConnect(a,b){ const r=await post('/api/workflow/edge',{from:a,to:b});
+  if(r.ok){ toast('connected'); load(); } else if(r.locked){ /*modal*/ } }
+
+async function addNode(){ const l=prompt('New node label:'); if(!l)return;
+  await post('/api/workflow/add',{label:l}); toast('node added'); load(); }
+async function importModel(){
+  const name=$('m-name').value.trim(), src=$('m-src').value.trim(), kind=$('m-kind').value;
+  if(!name){ toast('name required'); return; }
+  const r=await post('/api/workflow/import-model',{name,source:src,kind});
+  if(r.ok){ toast('imported — drag/Connect it in'); $('m-name').value='';$('m-src').value=''; load(); }
+}
+
+async function loadStats(adv, deep){
+  if(deep) $('statsbody').innerHTML='<p class="muted">timing retrieval + brief (warming model)…</p>';
+  const s = await api('/api/stats'+(adv?('?advanced=1'+(deep?'&deep=1':'')):''));
+  let h = '<div class="kv"><span>capabilities</span><span></span></div>';
+  const c=s.capabilities||{};
+  h += kv('semantic search', c.semantic?'on':'off') + kv('router trained', c.router_trained) +
+       kv('reranker trained', c.reranker_trained) + kv('vision data', c.vision_data) +
+       kv('persona signals', c.persona_signals) + kv('encryption avail', c.encryption_available);
+  h += '<h3 style="margin-left:0">graph</h3>';
+  for(const [k,v] of Object.entries(s.counts||{})) h+=kv(k,v);
+  if(adv && s.timings_ms){ h+='<h3 style="margin-left:0">inference time</h3>';
+    for(const [k,v] of Object.entries(s.timings_ms)) h+=kv(k, v==null?'—':v+' ms'); }
+  if(adv && s.internals){ h+='<h3 style="margin-left:0">learned internals</h3>';
+    if(s.internals.learned_alpha!=null) h+=kv('steer α', s.internals.learned_alpha);
+    (s.internals.top_fields||[]).forEach(f=>h+=kv('field: '+f.field, f.weight));
+    if(s.internals.reranker_weights) for(const [k,v] of Object.entries(s.internals.reranker_weights)) h+=kv('rr: '+k, v);
+    if(s.internals.workflow) h+=kv('workflow nodes', s.internals.workflow.nodes)+kv('custom nodes', s.internals.workflow.custom_nodes); }
+  $('statsbody').innerHTML = h;
+}
+function kv(k,v){ if(typeof v==='boolean') v=v?'yes':'no'; return `<div class="kv"><span>${esc(k)}</span><span>${esc(String(v))}</span></div>`; }
+
+async function chat(){
+  const inp=$('chatin'), t=inp.value.trim(); if(!t)return; inp.value='';
+  add('u','» '+t);
+  const r = await post('/api/chat',{text:t});
+  add('b', r.reply||'(no reply)');
+  if(r.result && (r.result.id || r.result.ok)) load();
+}
+function add(c,m){ const l=$('chatlog'); l.innerHTML+=`<div class="msg ${c}">${esc(m)}</div>`; l.scrollTop=l.scrollHeight; }
+
+function showModal(j){ $('modaltext').textContent=j.disclaimer||'This node is locked.';
+  $('modalhint').textContent=j.hint||''; $('modal').style.display='flex'; }
+function closeModal(){ $('modal').style.display='none'; }
+function tab(t){ document.querySelectorAll('.tabs div').forEach(d=>d.classList.toggle('on',d.dataset.t===t));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+t)); }
+
+load(); window.addEventListener('resize', render);
+</script>
