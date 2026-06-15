@@ -177,9 +177,11 @@ Cartograph is **modular** — install only what you need, and grow the graph to 
 
 | Install | Command | Adds |
 |---|---|---|
-| **Core** | `pip install cartograph__v1` | full graph + keyword search + viz + MCP. Tiny, instant. |
-| **Semantic** | `pip install "cartograph__v1[semantic]"` | meaning-based + hybrid search (~2 GB model) |
+| **Core** | `pip install cartograph__v1` | full graph + keyword search + viz + Studio + MCP. Tiny, instant. |
+| **Semantic** | `pip install "cartograph__v1[semantic]"` | meaning-based + hybrid search; the learned models (~2 GB) |
 | **ML** | `pip install "cartograph__v1[ml]"` | train your own graph models on your data |
+| **Vision** | `pip install "cartograph__v1[vision]"` | real-time screen capture → OCR → graph (`carto watch`; needs Tesseract) |
+| **Secure** | `pip install "cartograph__v1[secure]"` | at-rest encryption for sensitive data (e.g. screen captures) |
 | **Everything** | `pip install "cartograph__v1[full]"` | all of the above |
 
 **Graph-size tiers** — *don't* download one giant graph. Choose what fits:
