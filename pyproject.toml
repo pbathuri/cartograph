@@ -28,11 +28,12 @@ dependencies = [
 
 [project.optional-dependencies]
 # Semantic retrieval (GPU-accelerated if torch sees CUDA, else CPU). ~2GB download.
-semantic = ["sentence-transformers>=2.6", "numpy>=1.24"]
+# einops is required by the default nomic embedding model's remote code.
+semantic = ["sentence-transformers>=2.6", "numpy>=1.24", "einops>=0.7"]
 # Graph ML: train your own link-prediction / recommendation models on YOUR graph.
 ml = ["torch>=2.0", "scikit-learn>=1.3", "numpy>=1.24"]
 # Everything.
-full = ["sentence-transformers>=2.6", "torch>=2.0", "scikit-learn>=1.3", "numpy>=1.24"]
+full = ["sentence-transformers>=2.6", "torch>=2.0", "scikit-learn>=1.3", "numpy>=1.24", "einops>=0.7"]
 dev = ["pytest>=7"]
 
 [project.scripts]
