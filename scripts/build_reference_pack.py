@@ -31,7 +31,7 @@ def main() -> None:
     clones = out / "_repos"
     clones.mkdir(parents=True, exist_ok=True)
     store = Store(out / "graph.sqlite")
-    cfg = Config()
+    cfg = Config(field_focus=list(args.field))  # the pack IS these fields — label projects accordingly
 
     repos = []
     for f in args.field:

@@ -35,7 +35,7 @@ No cloud. No account. Your graph is a single SQLite file you own.
 
 ```bash
 pip install cartograph            # tiny, instant — no heavy ML
-carto init                        # pick folder(s) + (optional) your field
+carto init                        # pick folder(s) + your field(s) — declaring your field makes labels accurate
 carto ingest                      # build your graph (re-run anytime; only changed files reprocess)
 carto viz                         # 👀 see your graph in the browser
 carto retrieve "how did I handle auth" --chunks   # hybrid search over everything you've done

@@ -82,14 +82,54 @@ def _read(p: Path) -> str:
         return ""
 
 
-def infer_field(name: str, blob: str) -> str:
-    low = (name + " " + blob[:5000]).lower()
-    best, score = "", 0
+# Strong structural signals — a file extension or manifest is worth several token hits.
+EXT_FIELD = {
+    ".tsx": "web_frontend", ".jsx": "web_frontend", ".vue": "web_frontend", ".svelte": "web_frontend",
+    ".scss": "web_frontend", ".cu": "hpc", ".cuh": "hpc", ".ipynb": "ml_experiment",
+    ".tf": "devops", ".swift": "mobile", ".kt": "mobile",
+}
+MANIFEST_FIELD = {
+    "package.json": "web_frontend", "next.config.js": "web_frontend", "tailwind.config.js": "web_frontend",
+    "dockerfile": "devops", "docker-compose.yml": "devops", "pubspec.yaml": "mobile",
+    "cargo.toml": "library", "go.mod": "library", "dvc.yaml": "research_paper",
+    "dbt_project.yml": "data_pipeline", "airflow.cfg": "data_pipeline",
+}
+
+
+def infer_field(name: str, blob: str, exts: dict[str, int] | None = None,
+                manifests: set[str] | None = None, focus: list[str] | None = None) -> str:
+    """Combine three evidence sources: declared focus (strongest), structural signals (extensions +
+    manifest files), and token hits in README/source content. Returns 'general' when genuinely unsure."""
+    low = (name + " " + blob[:12000]).lower()
+    scores: dict[str, float] = {}
+
+    def add(f: str, w: float) -> None:
+        if f:
+            scores[f] = scores.get(f, 0.0) + w
+
     for fld, toks in FIELD_TOKENS.items():
-        s = sum(1 for t in toks if t in low)
-        if s > score:
-            best, score = fld, s
-    return best if score >= 2 else "general"
+        for t in toks:
+            if t in low:
+                add(fld, 1.0)
+    for ext, n in (exts or {}).items():
+        if ext in EXT_FIELD and n >= 2:
+            add(EXT_FIELD[ext], 2.5)
+    for m in (manifests or set()):
+        if m in MANIFEST_FIELD:
+            add(MANIFEST_FIELD[m], 3.0)
+    # library: a packaged project with a public API + few app entrypoints
+    if ("setup.py" in (manifests or set()) or "pyproject.toml" in (manifests or set())) and "__all__" in low:
+        add("library", 2.5)
+    # declared focus is the user's ground truth — a DOMINANT prior. If a project shows ANY signal for a
+    # focus field, prefer it; declared focus should generally win over noisy auto-detection.
+    for f in (focus or []):
+        add(f, 4.0)
+    if not scores:
+        return (focus[0] if focus else "general")
+    best = max(scores, key=lambda k: scores[k])
+    if scores[best] >= 2.0:
+        return best
+    return (focus[0] if focus else "general")
 
 
 def _is_ignored(path: Path, ignore: list[str]) -> bool:
@@ -113,10 +153,22 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None) -
                  and not _is_ignored(p, cfg.ignore)]
         if not files:
             continue
+        # Structural signals for field inference: extension histogram + manifest files present.
+        exts: dict[str, int] = {}
+        manifests: set[str] = set()
+        for p in proj.rglob("*"):
+            if p.is_file() and not _is_ignored(p, cfg.ignore):
+                exts[p.suffix.lower()] = exts.get(p.suffix.lower(), 0) + 1
+                if p.name.lower() in MANIFEST_FIELD or p.name.lower() in ("setup.py", "pyproject.toml"):
+                    manifests.add(p.name.lower())
+        # Content sample: READMEs in full + the head of several source files (richer than first-5).
         blob = ""
-        for p in files[:5]:
-            blob += " " + _read(p)[:1000]
-        fld = infer_field(proj.name, blob)
+        readmes = [p for p in files if p.name.lower().startswith("readme")]
+        for p in readmes[:2]:
+            blob += " " + _read(p)[:8000]
+        for p in files[:20]:
+            blob += " " + _read(p)[:800]
+        fld = infer_field(proj.name, blob, exts=exts, manifests=manifests, focus=cfg.field_focus)
         pid = store.upsert_project(proj.name, str(proj), fld)
         st.projects += 1
         st.fields[fld] = st.fields.get(fld, 0) + 1

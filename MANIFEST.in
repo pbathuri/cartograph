@@ -1,0 +1,8 @@
+include LICENSE README.md
+recursive-include cartograph *.html
+recursive-include docs *.md
+recursive-include scripts *.py *.sh *.bat
+recursive-include examples *
+global-exclude __pycache__/* *.pyc
+prune .venv
+prune **/.demo_home
