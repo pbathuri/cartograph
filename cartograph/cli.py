@@ -313,6 +313,14 @@ def serve(port: int = typer.Option(8787, "--port")) -> None:
 
 
 @app.command()
+def demo() -> None:
+    """See everything work in ~10s on a synthetic corpus — zero setup, your real workspace untouched."""
+    from .demo import run_demo
+    console.print("[bold]Cartograph demo[/bold] — building a graph + steering answers on sample data.")
+    run_demo(console)
+
+
+@app.command()
 def doctor() -> None:
     """Check your install + workspace (what's enabled, what to install for more)."""
     from .embed import available as sem_ok
