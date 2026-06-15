@@ -58,6 +58,26 @@ def test_build_brief_shape(graph):
     assert "persona_summary" in b
 
 
+def test_bidirectional_feedback_moves_weight_down(graph):
+    from cartograph.persona.profile import PersonaProfile, save_persona
+    # ml_project ingests as ml_experiment (declared focus); disliking it pulls ml_experiment down.
+    p = PersonaProfile(field_weights={"ml_experiment": 0.6, "web_frontend": 0.4})
+    save_persona(p)
+    before = p.field_weights["ml_experiment"]
+    p2 = record_feedback(p, graph, Config(), query="x", disliked_projects=["ml_project"], weight=1.0)
+    assert p2.field_weights["ml_experiment"] < before
+
+
+def test_prefs_flow_into_brief(graph):
+    p = load_persona(graph)
+    p.preferences = {"verbosity": "concise", "format": "bullets"}
+    from cartograph.persona.profile import save_persona
+    save_persona(p)
+    b = build_brief("how do I train a model", graph, Config(), load_persona(graph))
+    assert b["preferences"]["verbosity"] == "concise"
+    assert any("verbosity=concise" in g for g in b["output_guidance"])
+
+
 def test_mcp_personalize_tool(graph, monkeypatch):
     # the persona MCP tool returns a brief; run the server as a subprocess against this workspace
     env_home = str(Path(graph.path).parent)

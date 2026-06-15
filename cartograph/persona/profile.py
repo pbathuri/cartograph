@@ -36,10 +36,10 @@ class PersonaProfile:
         return sorted(self.field_weights.items(), key=lambda t: -t[1])[:k]
 
     def bump_field(self, fld: str, amount: float = 0.15) -> None:
-        """EMA-style nudge toward a field the user engaged with, then renormalize."""
+        """Nudge a field's emphasis up (engaged) or down (negative amount); clamp >=0, renormalize."""
         if not fld or fld == "general":
             return
-        self.field_weights[fld] = self.field_weights.get(fld, 0.0) + amount
+        self.field_weights[fld] = max(0.0, self.field_weights.get(fld, 0.0) + amount)
         self._renorm()
 
     def _renorm(self) -> None:
@@ -57,8 +57,8 @@ class PersonaProfile:
         except Exception:
             return None
 
-    def update_vector(self, new_vecs, lr: float = 0.2) -> None:
-        """EMA the preference centroid toward the mean of engaged-item embeddings."""
+    def update_vector(self, new_vecs, lr: float = 0.2, away: bool = False) -> None:
+        """EMA the preference centroid toward (or, if away=True, away from) engaged-item embeddings."""
         try:
             import numpy as np
             target = np.asarray(new_vecs, dtype=np.float32)
@@ -70,9 +70,9 @@ class PersonaProfile:
             target = target / n
             cur = self.load_vector()
             if cur is None:
-                vec = target
+                vec = -target if away else target
             else:
-                vec = (1 - lr) * cur + lr * target
+                vec = cur + (-lr if away else lr) * target       # attract or repel
                 vec = vec / (np.linalg.norm(vec) or 1.0)
             np.save(_vec_path(), vec.astype(np.float32))
             self.has_pref_vector = True
