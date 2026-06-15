@@ -20,7 +20,13 @@ import secrets
 import stat
 from pathlib import Path
 
+import re
+
 from .config import home
+
+# Exact loopback origins (with an optional port) — anchored so a hostile host like
+# "http://127.0.0.1.attacker.com" can NEVER match (an unanchored startswith would).
+_LOOPBACK_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$")
 
 # Origins allowed to talk to the local API from a browser. The web-GenAI userscript runs on these;
 # everything else is refused (no `*`). Loopback is allowed for the studio app itself.
@@ -73,7 +79,7 @@ def cors_origin(origin: str | None) -> str | None:
     if not origin:
         return None
     o = origin.rstrip("/")
-    if o in ALLOWED_ORIGINS or o.startswith("http://127.0.0.1") or o.startswith("http://localhost"):
+    if o in ALLOWED_ORIGINS or _LOOPBACK_ORIGIN.match(o):
         return o
     return None
 
