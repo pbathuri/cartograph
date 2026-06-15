@@ -36,6 +36,12 @@ TOOLS = [
                     "snippets) to prepend so your answer fits this specific user and their work. Adapts "
                     "as feedback accrues.",
      "params": {"prompt": "string", "top_k": "int? (default 6)"}},
+    {"name": "record_use",
+     "description": "Close the learning loop: after answering, report which projects actually helped "
+                    "(and which didn't) so the persona adapts to what the user responds to. Call when you "
+                    "used Cartograph context in a useful answer.",
+     "params": {"query": "string?", "helped": "string[] project names",
+                "not_helpful": "string[]? project names"}},
     {"name": "graph_stats",
      "description": "Counts in your graph (projects/files/chunks/edges).", "params": {}},
 ]
@@ -103,6 +109,13 @@ def _dispatch(rid: Any, name: str, args: dict) -> str:
                 return _resp(rid, error="prompt is required")
             return _resp(rid, build_brief(prompt, store, cfg, load_persona(store),
                                           top_k=int(args.get("top_k", 6))))
+        if name == "record_use":
+            from .persona import record_feedback
+            from .persona.profile import load_persona
+            p = record_feedback(load_persona(store), store, cfg, query=args.get("query", ""),
+                                liked_projects=list(args.get("helped", []) or []),
+                                disliked_projects=list(args.get("not_helpful", []) or []))
+            return _resp(rid, {"ok": True, "n_signals": p.n_signals, "persona": p.summary()})
     except Exception as e:  # noqa: BLE001 - never hang the client
         return _resp(rid, error=f"{name} failed: {e}")
     return _resp(rid, error=f"unhandled: {name}")

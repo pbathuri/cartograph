@@ -35,6 +35,7 @@ No cloud. No account. Your graph is a single SQLite file you own.
 
 ```bash
 pip install cartograph            # tiny, instant — no heavy ML
+carto demo                        # ⚡ see it ALL work in ~10s on a synthetic corpus (zero setup)
 carto init                        # pick folder(s) + your field(s) — declaring your field makes labels accurate
 carto ingest                      # build your graph (re-run anytime; only changed files reprocess)
 carto viz                         # 👀 see your graph in the browser
@@ -139,6 +140,7 @@ Your agent now has these tools:
 | `relevant_projects` | which of your repos relate to the task |
 | `elevate_task` | top-of-field briefing: bar + reference repos + playbook |
 | `frontier_status` | your coverage of each field's best references |
+| `record_use` | after answering, report what helped → the persona adapts automatically |
 | `graph_stats` | size of your graph |
 
 > Tip: tell your agent in its system prompt *"At the start of a task, call `elevate_task` and
@@ -216,8 +218,8 @@ Field inference lives in `cartograph/ingest.py`.
 
 ## 🗂️ Commands
 
-`carto init · ingest · index · retrieve · elevate · frontier · review · persona · personalize · feedback ·
-serve · stats · viz · mcp-server · doctor` (run `carto --help` or `carto <cmd> --help`).
+`carto demo · init · ingest · index · retrieve · elevate · frontier · review · persona · personalize ·
+feedback · prefs · serve · stats · viz · mcp-server · doctor` (run `carto --help` or `carto <cmd> --help`).
 
 ## License
 
