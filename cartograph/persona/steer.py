@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import Config
-from ..elite.catalog import match_field
 from ..retrieve import retrieve
 from ..storage import Store
 from .profile import PersonaProfile
@@ -88,7 +87,9 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
                 max_chars: int = 0) -> dict:
     """The model-agnostic personalization envelope an agent prepends before answering.
     `max_chars` (0 = unlimited) caps total snippet text so the brief fits a context budget."""
-    pfield = match_field(prompt) or "general"
+    from ..router import route
+    routed = route(prompt, cfg)                      # learned field router (keyword fallback)
+    pfield = routed["field"]
     pr = personalized_retrieve(prompt, store, cfg, persona, top_k=top_k)
     prefs = {**_DEFAULT_GUIDANCE, **persona.preferences}
     guidance = []
@@ -117,6 +118,7 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
     return {
         "prompt": prompt,
         "prompt_field": pfield,
+        "field_routing": routed,
         "persona_summary": persona.summary(),
         "top_fields": persona.top_fields(4),
         "preferences": prefs,

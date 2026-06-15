@@ -203,6 +203,38 @@ def review(project: str = typer.Argument(..., help="Path to the build."),
 
 
 @app.command()
+def train() -> None:
+    """Train the in-between-layer models on YOUR data: the field router (per-field centroid embeddings).
+    Re-run after big ingests. Needs the semantic extra; degrades to keyword routing without it."""
+    from .router import build_centroids
+    from .embed import available
+    if not available():
+        console.print(r"[yellow]semantic extra not installed[/yellow] — routing uses keywords. "
+                      r"For the learned router: [bold]pip install 'cartograph__v1\[semantic]'[/bold] then carto index.")
+        raise typer.Exit(1)
+    console.print("[bold]training field router[/bold] (centroid per field from your corpus) …")
+    counts = build_centroids(_store(read_only=True), load_config(),
+                             progress=lambda m: console.print(f"  {m}", style="dim"))
+    if not counts:
+        console.print("[yellow]no field-labeled chunks yet[/yellow] — run carto ingest (declare --field for best labels).")
+        return
+    console.print("[green]✓ router trained[/green] on " + ", ".join(f"{k}({v})" for k, v in counts.items()))
+
+
+@app.command()
+def route(prompt: str = typer.Argument(..., help="A prompt to route to its field."),
+          json_out: bool = typer.Option(False, "--json")) -> None:
+    """Show which field a prompt routes to (learned router if trained, else keywords)."""
+    from .router import route as _route
+    r = _route(prompt, load_config())
+    if json_out:
+        typer.echo(json.dumps(r, indent=2))
+        return
+    extra = f"  (score {r['score']}, vs {r['runner_up']})" if r.get("score") is not None else ""
+    console.print(f"[bold]{r['field']}[/bold]  [dim]via {r['method']}{extra}[/dim]")
+
+
+@app.command()
 def persona(rebuild: bool = typer.Option(False, "--rebuild", help="Re-derive field weights from the corpus."),
             json_out: bool = typer.Option(False, "--json")) -> None:
     """Show (or rebuild) your learned persona: field weights, preferences, confidence."""
