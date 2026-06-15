@@ -221,8 +221,9 @@ Field inference lives in `cartograph/ingest.py`.
 
 ## 🗂️ Commands
 
-`carto demo · agent-setup · init · ingest · index · retrieve · elevate · frontier · review · persona ·
-personalize · feedback · prefs · serve · stats · viz · mcp-server · doctor` (run `carto --help`).
+`carto demo · agent-setup · init · ingest · index · train · route · retrieve · elevate · frontier ·
+review · persona · personalize · feedback · prefs · serve · stats · viz · mcp-server · doctor`
+(run `carto --help`).
 
 ## License
 
