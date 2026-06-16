@@ -30,5 +30,6 @@ def test_mcp_record_use_closes_loop(tmp_path):
     p = subprocess.run([sys.executable, "-m", "cartograph.mcp_server"],
                        input=payload, capture_output=True, text=True, timeout=60, env=env)
     out = [json.loads(x) for x in p.stdout.splitlines() if x.strip()]
-    assert out and out[0]["result"]["ok"] is True
-    assert out[0]["result"]["n_signals"] == 1
+    res = json.loads(out[0]["result"]["content"][0]["text"])   # MCP-spec content-wrapped result
+    assert res["ok"] is True
+    assert res["n_signals"] == 1

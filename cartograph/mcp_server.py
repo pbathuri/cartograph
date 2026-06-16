@@ -57,6 +57,23 @@ def _resp(req_id: Any, result: Any = None, error: str | None = None) -> str:
     return json.dumps(body)
 
 
+def _params_to_schema(params: dict | None) -> dict:
+    """Shorthand `params` -> JSON-Schema `inputSchema` (MCP-spec; strict clients like Cursor require it)."""
+    props: dict[str, Any] = {}
+    required: list[str] = []
+    for name, spec in (params or {}).items():
+        s = str(spec).lower()
+        t = ("integer" if "int" in s else "number" if ("float" in s or "number" in s)
+             else "boolean" if "bool" in s else "string")
+        props[name] = {"type": t, "description": str(spec)}
+        if "?" not in s and "default" not in s:
+            required.append(name)
+    schema: dict[str, Any] = {"type": "object", "properties": props}
+    if required:
+        schema["required"] = required
+    return schema
+
+
 def _handle(req: dict) -> str | None:
     method = req.get("method")
     params = req.get("params") or {}
@@ -66,16 +83,22 @@ def _handle(req: dict) -> str | None:
         from . import __version__
         return _resp(rid, {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}},
                            "serverInfo": {"name": "cartograph", "version": __version__}})
-    if method in ("notifications/initialized",):
-        return None
+    if isinstance(method, str) and method.startswith("notifications/"):
+        return None                                       # JSON-RPC notifications get no response
     if method == "tools/list":
-        return _resp(rid, {"tools": TOOLS})
+        tools = [{"name": t["name"], "description": t["description"],
+                  "inputSchema": _params_to_schema(t.get("params"))} for t in TOOLS]
+        return _resp(rid, {"tools": tools})
     if method == "tools/call":
         name = params.get("name", "")
         args = params.get("arguments", {}) or {}
         if name not in _VALID:
             return _resp(rid, error=f"unknown tool: {name}")
-        return _dispatch(rid, name, args)
+        inner = _dispatch(rid, name, args)
+        obj = json.loads(inner) if inner else {}
+        if "error" in obj:
+            return _resp(rid, error=obj["error"].get("message", "tool error"))
+        return _resp(rid, {"content": [{"type": "text", "text": json.dumps(obj.get("result"))}]})
     if method in _VALID:  # allow bare method calls too
         return _dispatch(rid, method, params)
     return _resp(rid, error=f"unknown method: {method}")
@@ -132,8 +155,9 @@ def serve() -> None:
             req = json.loads(line)
         except json.JSONDecodeError:
             continue
+        is_notification = "id" not in req                 # JSON-RPC notifications get no response
         out = _handle(req)
-        if out is not None:
+        if out is not None and not is_notification:
             sys.stdout.write(out + "\n")
             sys.stdout.flush()
 

@@ -128,4 +128,18 @@ def test_mcp_personalize_tool(graph, monkeypatch):
                        input=payload, capture_output=True, text=True, timeout=60, env=env)
     out = [json.loads(x) for x in p.stdout.splitlines() if x.strip()]
     assert out and "result" in out[0], p.stdout + p.stderr
-    assert "output_guidance" in out[0]["result"]
+    brief = json.loads(out[0]["result"]["content"][0]["text"])   # MCP-spec content-wrapped result
+    assert "output_guidance" in brief
+
+
+def test_mcp_tools_list_spec_compliant():
+    """Strict clients (Cursor) require each tool to carry an object `inputSchema`, and notifications to
+    get NO response. Regression guard for the cursor-rejection bug."""
+    payload = ('{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n'
+               '{"jsonrpc":"2.0","method":"notifications/initialized"}\n')
+    p = subprocess.run([sys.executable, "-m", "cartograph.mcp_server"],
+                       input=payload, capture_output=True, text=True, timeout=60)
+    out = [json.loads(x) for x in p.stdout.splitlines() if x.strip()]
+    assert len(out) == 1                                          # notification got no reply
+    tools = out[0]["result"]["tools"]
+    assert tools and all(isinstance(t["inputSchema"], dict) for t in tools)
