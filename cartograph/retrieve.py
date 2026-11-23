@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from .config import Config
+from .documents import cite, legacy_locator
 from .storage import Store
 
 _FTS_BAD = re.compile(r"[^\w\s]")
@@ -67,8 +68,8 @@ def _chunks_by_id(store: Store, ids: list[int]) -> dict[int, dict]:
     if not ids:
         return {}
     ph = ",".join("?" * len(ids))
-    sql = ("SELECT ch.id AS chunk_id, ch.chunk_text, f.path AS file_path, p.name AS project_name, "
-           "p.id AS project_id "
+    sql = (f"SELECT ch.id AS chunk_id, ch.chunk_text, {store.locator_sql()} AS locator, f.path AS file_path, "
+           "p.name AS project_name, p.id AS project_id "
            "FROM chunks ch JOIN files f ON f.id=ch.file_id LEFT JOIN projects p ON p.id=f.project_id "
            f"WHERE ch.id IN ({ph})")
     with store.cursor() as c:
@@ -99,6 +100,9 @@ def retrieve(query: str, store: Store, cfg: Config, *, top_k: int = 10, rrf_k: i
         if i in pool:
             ch = dict(pool[i])
             ch["score"] = round(fscore.get(i, 0.0), 6)       # fused relevance score
+            if not ch.get("locator"):
+                ch["locator"] = legacy_locator(ch.get("file_path") or "", ch.get("chunk_text") or "")
+            ch["cite"] = cite(ch.get("file_path") or "", ch.get("locator"))
             chunks.append(ch)
     method = "hybrid" if sem_ids else "fts"
     projects: list[str] = []

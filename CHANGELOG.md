@@ -17,6 +17,20 @@ All notable changes to Cartograph (`cartograph__v1`) are documented here. Versio
 - An `index/` folder missing `chunk_ids.npy` is no longer treated as a usable index.
 - fp16 inference on CUDA/MPS (~15% faster on Apple silicon, identical vectors at float16 storage).
 
+### Documents, with citations
+- **PDF, DOCX, PPTX, XLSX, EPUB and HTML are ingested.** Office/EPUB/HTML need no extra dependency;
+  PDF uses `pypdf` (`pip install "cartograph__v1[docs]"`) or PyMuPDF when present, with optional OCR of
+  text-less pages (`ocr: true`). Documents get their own size cap, `max_doc_mb` (default 50).
+- **Every chunk carries a locator** and every retrieval result a `cite`: `src/train.py:L40-88`,
+  `paper.pdf p.12`, `talk.pptx slide 3`, `doses.xlsx sheet Doses`, `thesis.docx § Methods`,
+  `analysis.ipynb cell 4-6`. Chunks never straddle pages or slides.
+- Chunks from graphs built before 2.0 get line citations by re-reading the source file on demand
+  (skipped quietly when the file is gone, e.g. on an unplugged drive).
+- HTML is indexed as text (scripts/styles dropped) instead of raw markup. More source types:
+  CUDA, Lua, Dart, Haskell, Elixir, Zig, Fortran, Protobuf, GraphQL, Terraform, BibTeX, MDX, Quarto, Typst...
+- Office lock files (`~$x.docx`) are skipped; `carto ingest` reports how many PDFs were skipped for lack
+  of a PDF reader.
+
 ### Change detection
 - Files are hashed in full (v1 hashed only the first 1 MB, so edits past it went unnoticed). Files up to
   1 MB keep their v1 hash, so upgrading re-chunks only the 1–2 MB files that could have been stale.
