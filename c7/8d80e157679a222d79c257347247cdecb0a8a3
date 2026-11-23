@@ -1,0 +1,33 @@
+cartograph/hooks.py
+  s_9597705f0f5f64::t_621d7c94380193 1-373
+  s_9597705f0f5f64::t_516e49e9e7ab4a 374-402
+tests/test_memory.py
+  s_9597705f0f5f64::t_74283d895c5541 1-183
+cartograph/memory.py
+  s_9597705f0f5f64::t_7598b5a9b6c658 1-322
+cartograph/storage.py
+  s_9597705f0f5f64::t_1da8bfa9a38b00 104
+  s_9597705f0f5f64::t_6f803419e76015 57-78
+CHANGELOG.md
+  s_9597705f0f5f64::t_8c443130be387c 45-60
+cartograph/cli.py
+  s_9597705f0f5f64::t_485996308d5fef 13,260,262,752-883
+cartograph/mcp_server.py
+  s_9597705f0f5f64::t_ee0875c73c008b 98-130,243-244,300-316
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c78d80e157679a222d79c257347247cdecb0a8a3",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
