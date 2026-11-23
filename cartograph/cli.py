@@ -10,6 +10,7 @@ Typical first run:
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -256,8 +257,9 @@ def entities(
     for r in rows:
         seen = r["first_seen"] if r["first_seen"] == r["last_seen"] else f"{r['first_seen']} → {r['last_seen']}"
         cells = [r.get("project") or ""] if find else []
+        ev = (r.get("evidence") or {}).get("cite", "")
         t.add_row(*cells, r["entity"], r["relation"], str(r["files"]), f"{r['confidence']:.2f}", seen or "",
-                  (r.get("evidence") or {}).get("cite", ""))
+                  Path(ev).name if ev else "")
     console.print(t)
     for x in related[:5]:
         console.print(f"  [magenta]↔ {x['project']}[/magenta] [dim]score {x['score']} via {', '.join(x['via'][:4])}[/dim]")
@@ -745,6 +747,138 @@ def doctor() -> None:
         console.print(f"torch    : {torch.__version__}  cuda={torch.cuda.is_available()}")
     except Exception:
         console.print(r"torch    : not installed (CPU embedding only; pip install 'cartograph__v1\[ml]')")
+
+
+memory_app = typer.Typer(help="Agent memory shared by every client: decisions, rejected approaches, todos, sessions.")
+app.add_typer(memory_app, name="memory")
+
+
+def _print_memories(items: list[dict]) -> None:
+    for m in items:
+        closed = f" [dim](until {m['valid_to']} → {m['superseded_by']})[/dim]" if m.get("valid_to") else ""
+        stale = " [yellow](possibly stale)[/yellow]" if m.get("stale") else ""
+        console.print(f"[bold]{m['id']:>5}[/bold] [cyan]{m['kind']:<10}[/cyan] {m['text'][:200]}{stale}{closed}")
+        console.print(f"        [dim]{m.get('project') or 'global'} · {m.get('source')} · {m['created']}[/dim]")
+        for s in m.get("stale") or []:
+            console.print(f"        [yellow]{s}[/yellow]")
+
+
+@memory_app.command("add")
+def memory_add(
+    text: str = typer.Argument(..., help="What to remember."),
+    kind: str = typer.Option("note", "--kind", "-k", help="decision | rejected | preference | fact | todo | note"),
+    project: str = typer.Option(None, "--project", "-p", help="Project name (default: the project at the cwd)."),
+    anchor: list[str] = typer.Option(None, "--anchor", "-a", help="File this depends on (flags staleness on change)."),
+    supersedes: list[int] = typer.Option(None, "--supersedes", "-s", help="Memory id(s) this replaces."),
+    global_: bool = typer.Option(False, "--global", help="Not tied to any project."),
+) -> None:
+    """Remember something (a decision, a rejected approach, a todo...)."""
+    from . import memory as M
+    m = M.remember(_store(), text, kind, project=project, cwd=None if global_ else os.getcwd(),
+                   anchors=anchor or [], supersedes=supersedes or [])
+    console.print(f"[green]✓[/green] remembered [bold]{m['id']}[/bold] ({m['kind']}, {m.get('project') or 'global'})"
+                  + (" — already known" if m.get("duplicate") else ""))
+    for c in m.get("possible_conflicts") or []:
+        console.print(f"  [yellow]similar to {c['id']}[/yellow] ({c['kind']}): {c['text'][:120]}  "
+                      f"[dim]→ carto memory supersede {c['id']} --by {m['id']}[/dim]")
+
+
+@memory_app.command("recall")
+def memory_recall(
+    query: str = typer.Argument("", help="Keywords (empty = newest)."),
+    project: str = typer.Option(None, "--project", "-p"),
+    kind: list[str] = typer.Option(None, "--kind", "-k"),
+    history: bool = typer.Option(False, "--history", help="Include superseded memories."),
+    limit: int = typer.Option(15, "--limit"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Find memories (active only unless --history), with staleness warnings."""
+    from . import memory as M
+    res = M.recall(_store(), query, project=project, kinds=kind or None, history=history, limit=limit)
+    if json_out:
+        typer.echo(json.dumps(res, indent=2))
+        return
+    _print_memories(res["memories"]) if res["memories"] else console.print("[dim]nothing remembered yet[/dim]")
+
+
+@memory_app.command("supersede")
+def memory_supersede(
+    old: int = typer.Argument(..., help="Memory id to close."),
+    by: int = typer.Option(None, "--by", help="The memory that replaces it."),
+    reason: str = typer.Option("", "--reason"),
+) -> None:
+    """Close a memory (it stays in history with its validity interval)."""
+    from . import memory as M
+    M.supersede(_store(), old, by, reason)
+    console.print(f"[green]✓[/green] {old} superseded" + (f" by {by}" if by else ""))
+
+
+@memory_app.command("forget")
+def memory_forget(mid: int = typer.Argument(...)) -> None:
+    """Delete a memory permanently (prefer `supersede`, which keeps history)."""
+    from . import memory as M
+    console.print("[green]✓ deleted[/green]" if M.forget(_store(), mid) else f"[red]no memory {mid}[/red]")
+
+
+@memory_app.command("brief")
+def memory_brief(
+    project: str = typer.Option(None, "--project", "-p"),
+    max_chars: int = typer.Option(2000, "--max-chars"),
+) -> None:
+    """The session-start digest an agent receives for this folder's project."""
+    from . import memory as M
+    b = M.brief(_store(read_only=True), project=project, cwd=os.getcwd(), max_chars=max_chars)
+    console.print(b["text"] or "[dim]no memories for this project yet[/dim]")
+
+
+@memory_app.command("hook", hidden=True)
+def memory_hook(client: str = typer.Option(..., "--client"),
+                payload: str = typer.Argument(None, help="Codex passes the event as an argument.")) -> None:
+    """Hook entry point for agent clients (reads the event JSON on stdin)."""
+    from .hooks import run_hook
+    raw = payload if payload is not None else ("" if sys.stdin.isatty() else sys.stdin.read())
+    sys.stdout.write(run_hook(client, raw) + "\n")
+
+
+hooks_app = typer.Typer(help="Capture agent sessions automatically (Claude Code, Cursor, Gemini CLI, Codex).")
+app.add_typer(hooks_app, name="hooks")
+
+
+@hooks_app.command("install")
+def hooks_install(
+    client: list[str] = typer.Argument(None, help="claude-code | cursor | gemini | codex (default: all found)"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """Add Cartograph's session hooks to your clients' user config (backs up the file first)."""
+    from . import hooks as H
+    targets = client or [s["client"] for s in H.status() if s["exists"] or s["client"] == "cursor"]
+    for c in targets:
+        if c not in H.CLIENTS:
+            console.print(f"[red]unknown client {c}[/red] (choose from {', '.join(H.CLIENTS)})")
+            continue
+        r = H.install(c, dry_run=dry_run)
+        mark = "[green]✓[/green]" if r["changed"] else "[dim]·[/dim]"
+        console.print(f"{mark} {c:<12} {r['path']}  {', '.join(r.get('events') or []) or r.get('note', 'already installed')}")
+    if not dry_run:
+        console.print("[dim]restart the client (or reload its window) to pick up the hooks[/dim]")
+
+
+@hooks_app.command("uninstall")
+def hooks_uninstall(client: list[str] = typer.Argument(None)) -> None:
+    """Remove Cartograph's hook entries (other hooks are left alone)."""
+    from . import hooks as H
+    for c in client or list(H.CLIENTS):
+        r = H.uninstall(c)
+        console.print(f"{'[green]✓ removed[/green]' if r['changed'] else '[dim]· none[/dim]'} {c}")
+
+
+@hooks_app.command("status")
+def hooks_status() -> None:
+    """Which clients have Cartograph's session hooks."""
+    from . import hooks as H
+    for s in H.status():
+        state = "[green]installed[/green]" if s["installed"] else ("not installed" if s["exists"] else "[dim]client not found[/dim]")
+        console.print(f"  {s['client']:<12} {state}  [dim]{s['config']}[/dim]")
 
 
 if __name__ == "__main__":

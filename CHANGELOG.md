@@ -42,6 +42,22 @@ All notable changes to Cartograph (`cartograph__v1`) are documented here. Versio
 - `carto entities PROJECT`, `carto entities --find pydantic`, `carto entities --backfill` (one pass over an
   existing graph; 6.5M chunks took ~15 min), and an `entities` MCP tool.
 
+### Memory every agent shares
+- **Temporal memory** in the same SQLite file: decisions, rejected approaches, preferences, facts, todos,
+  notes and session logs. Nothing is overwritten — `supersede` closes a memory's validity interval and
+  points at its replacement; history stays queryable.
+- **Staleness**: memories anchored to files are flagged when those files change or disappear (files on an
+  unmounted drive are reported as unavailable, not missing).
+- **Conflict hints**: `remember` returns similar active memories of the same project so the agent can
+  supersede instead of piling up contradictions.
+- **`brief`**: a session-start digest for the project at the cwd under a hard character budget.
+- **Automatic capture through client hooks** — `carto hooks install` for Claude Code, Cursor, Gemini CLI
+  (hooks) and Codex (`notify`). Session start injects the brief; the session's goal, edited files and
+  commands become one `session` memory anchored to those files; `decision: …` / `rejected: …` / `todo: …`
+  lines said in chat become memories. Existing hooks are preserved and the config is backed up first.
+- MCP tools `brief`, `recall` (read-only) and `remember`, `supersede` (write; hidden by `--read-only`).
+- CLI: `carto memory add | recall | supersede | forget | brief`, `carto hooks install | uninstall | status`.
+
 ### Change detection
 - Files are hashed in full (v1 hashed only the first 1 MB, so edits past it went unnoticed). Files up to
   1 MB keep their v1 hash, so upgrading re-chunks only the 1–2 MB files that could have been stale.
