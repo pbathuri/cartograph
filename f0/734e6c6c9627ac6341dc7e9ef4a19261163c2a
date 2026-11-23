@@ -1,0 +1,34 @@
+tests/test_retrieval_modes.py
+  s_9597705f0f5f64::t_4174b00e794543 1-124
+cartograph/retrieve.py
+  s_9597705f0f5f64::t_543cfe03469359 10
+  s_9597705f0f5f64::t_b7e347152ca3c3 115-227,238
+  s_9597705f0f5f64::t_3b5cd406e8e07a 56
+  s_9597705f0f5f64::t_c47dfd19150b9f 228-237
+cartograph/ann.py
+  s_9597705f0f5f64::t_8c225fde183c41 17-21,23-25,27-28,30-32,38-40,42-52,89-95,97-101,103,106,117,123,142-150,160-163,165-167
+  s_9597705f0f5f64::t_bd3c9e08a1a6e1 1-16,22,26,29,33-37,41,53-88,96,102,104-105,107-116,118-122,124-141,151-159,164,168-183
+  s_9597705f0f5f64::t_366ceaaf116bed 184-187
+cartograph/cli.py
+  s_9597705f0f5f64::t_30c7d920f216af 164-165,167-168,170-180,214-215,220-237
+cartograph/embed.py
+  s_9597705f0f5f64::t_783cc86ca44f26 8-9,219,273-277,290-301,314-319,365,370-385,391-416,420-429,431
+cartograph/mcp_server.py
+  s_9597705f0f5f64::t_5b42fc43a95d08 41-44,46-52,270-274
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f0734e6c6c9627ac6341dc7e9ef4a19261163c2a",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
