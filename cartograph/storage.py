@@ -114,15 +114,23 @@ class Store:
             c.execute("DELETE FROM edges WHERE src_id=? OR dst_id=?", (project_id, project_id))
             c.execute("DELETE FROM projects WHERE id=?", (project_id,))
 
+    @staticmethod
+    def _under(path: str, root: str) -> bool:
+        """Separator- and case-correct 'path is root or inside root' (works on Windows and POSIX)."""
+        import os
+        a = os.path.normcase(os.path.normpath(path))
+        b = os.path.normcase(os.path.normpath(root))
+        return a == b or a.startswith(b.rstrip(os.sep) + os.sep)
+
     def prune_projects_under(self, root: str, keep_paths: set[str]) -> int:
         """Delete projects stored at or under `root` whose folder is no longer a discovered project
         (e.g. an old whole-folder blob after project discovery got finer). Returns how many were removed."""
-        root = root.rstrip("/")
+        import os
+        keep = {os.path.normcase(os.path.normpath(k)) for k in keep_paths}
         with self.cursor() as c:
-            rows = c.execute("SELECT id, path FROM projects WHERE path = ? OR path LIKE ? ESCAPE '\\'",
-                             (root, root.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%")
-                             ).fetchall()
-        stale = [r["id"] for r in rows if r["path"] not in keep_paths]
+            rows = c.execute("SELECT id, path FROM projects WHERE path IS NOT NULL AND path != ''").fetchall()
+        stale = [r["id"] for r in rows if self._under(r["path"], root)
+                 and os.path.normcase(os.path.normpath(r["path"])) not in keep]
         for pid in stale:
             self.delete_project(pid)
         return len(stale)
@@ -131,12 +139,11 @@ class Store:
         """Delete projects whose folder is not under any configured root (left over from an old config or
         a folder that was moved away). Projects named in `keep_names` (e.g. live screen activity) stay."""
         keep_names = keep_names or set()
-        prefixes = [r.rstrip("/") for r in roots]
         with self.cursor() as c:
             rows = c.execute("SELECT id, name, path FROM projects").fetchall()
         stale = [r["id"] for r in rows
                  if r["name"] not in keep_names and r["path"]
-                 and not any(r["path"] == p or r["path"].startswith(p + "/") for p in prefixes)]
+                 and not any(self._under(r["path"], root) for root in roots)]
         for pid in stale:
             self.delete_project(pid)
         return len(stale)
