@@ -127,16 +127,23 @@ class PersonaProfile:
                 f"| steer α={self.learned_alpha:.2f}{sub}")
 
 
-def build_from_corpus(store) -> PersonaProfile:
-    """Initialize field weights + confidence from the user's ingested corpus (project + chunk density)."""
+REFERENCE_DIRS = ("References", "references", "third_party", "vendor")
+
+
+def build_from_corpus(store, *, reference_dirs: tuple[str, ...] | list[str] = REFERENCE_DIRS) -> PersonaProfile:
+    """Initialize field weights + confidence from the user's ingested corpus (project + chunk density).
+    Projects inside a reference folder (cloned third-party repos) are retrieval material, not the user's
+    own work, so they don't shape the persona."""
     p = PersonaProfile()
     counts: dict[str, int] = {}
     chunks: dict[str, int] = {}
+    excl = " AND ".join("p.path NOT LIKE ?" for _ in reference_dirs) or "1=1"
+    args = [f"%/{d}/%" for d in reference_dirs]
     with store.cursor() as c:
         for r in c.execute(
             "SELECT p.field AS field, count(DISTINCT p.id) AS np, count(ch.id) AS nc "
             "FROM projects p LEFT JOIN files f ON f.project_id=p.id LEFT JOIN chunks ch ON ch.file_id=f.id "
-            "GROUP BY p.field").fetchall():
+            f"WHERE {excl} GROUP BY p.field", args).fetchall():
             d = dict(r)
             fld = d["field"] or "general"
             if fld == "general":

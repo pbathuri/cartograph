@@ -128,6 +128,14 @@ def ingest(
         raise typer.Exit(1)
     from .ingest import ingest_path
     store = _store()
+    if not path:
+        # Full refresh of the configured roots: drop projects outside every root (old configs, moved
+        # folders). Unmounted roots still count as roots, so an unplugged drive never loses its projects.
+        all_roots = [str(Path(_ANSI.sub("", r).strip()).expanduser().resolve()) for r in cfg.roots]
+        from .vision.pipeline import PROJECT_NAME as _SCREEN
+        n = store.prune_outside(all_roots, keep_names={_SCREEN})
+        if n:
+            console.print(f"[dim]removed {n} project(s) outside your configured roots[/dim]")
     total = {"projects": 0, "files_indexed": 0, "chunks": 0}
     fields: dict = {}
     for t in targets:
@@ -146,8 +154,9 @@ def ingest(
 
 
 @app.command()
-def index() -> None:
-    """Build the semantic vector index (needs `pip install cartograph__v1[semantic]`). Re-run after ingest."""
+def index(full: bool = typer.Option(False, "--full", help="Re-embed every chunk instead of only new ones.")) -> None:
+    """Build the semantic vector index (needs `pip install cartograph__v1[semantic]`). Re-run after ingest;
+    only chunks added since the last index are embedded."""
     from .embed import available, build_index
     if not available():
         console.print(r"[yellow]semantic extra not installed.[/yellow] "
@@ -155,8 +164,10 @@ def index() -> None:
         raise typer.Exit(1)
     cfg = load_config()
     console.print("[bold]building semantic index[/bold] (first run downloads the model) …")
-    res = build_index(_store(read_only=True), cfg, progress=lambda m: console.print(f"  {m}", style="dim"))
-    console.print(f"[green]✓ indexed[/green] {res.get('vectors', 0)} chunks -> {res.get('dir', index_dir())}")
+    res = build_index(_store(read_only=True), cfg, full=full,
+                      progress=lambda m: console.print(f"  {m}", style="dim"))
+    console.print(f"[green]✓ indexed[/green] {res.get('vectors', 0)} chunks "
+                  f"({res.get('embedded', 0)} embedded, {res.get('reused', 0)} reused) -> {res.get('dir', index_dir())}")
 
 
 @app.command()
