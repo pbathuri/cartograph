@@ -1,0 +1,24 @@
+cartograph/viz/index.html
+  s_9597705f0f5f64::t_a35bb3bcb43f99 82
+README.md
+  s_9597705f0f5f64::t_9b5092f01570be 41-44
+CHANGELOG.md
+  s_9597705f0f5f64::t_03abc6bfcbfb44 109
+  s_9597705f0f5f64::t_1920725c99be07 5-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "19077825ed1c722cb98c84e10c376490482cfdbc",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
