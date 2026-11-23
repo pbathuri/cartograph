@@ -1,0 +1,183 @@
+<svg class="rich-terminal" viewBox="0 0 1385 757.5999999999999" xmlns="http://www.w3.org/2000/svg">
+    <!-- Generated with Rich https://www.textualize.io -->
+    <style>
+
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Regular"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Regular.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Regular.woff") format("woff");
+        font-style: normal;
+        font-weight: 400;
+    }
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Bold"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Bold.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Bold.woff") format("woff");
+        font-style: bold;
+        font-weight: 700;
+    }
+
+    .terminal-104160453-matrix {
+        font-family: Fira Code, monospace;
+        font-size: 20px;
+        line-height: 24.4px;
+        font-variant-east-asian: full-width;
+    }
+
+    .terminal-104160453-title {
+        font-size: 18px;
+        font-weight: bold;
+        font-family: arial;
+    }
+
+    .terminal-104160453-r1 { fill: #c5c8c6;font-weight: bold }
+.terminal-104160453-r2 { fill: #c5c8c6 }
+.terminal-104160453-r3 { fill: #68a0b3;font-weight: bold }
+.terminal-104160453-r4 { fill: #868887 }
+.terminal-104160453-r5 { fill: #98a84b }
+.terminal-104160453-r6 { fill: #68a0b3 }
+.terminal-104160453-r7 { fill: #98729f;font-weight: bold }
+.terminal-104160453-r8 { fill: #98729f }
+.terminal-104160453-r9 { fill: #4e707b;font-weight: bold }
+.terminal-104160453-r10 { fill: #ffd700 }
+.terminal-104160453-r11 { fill: #d0b344 }
+.terminal-104160453-r12 { fill: #d0b344;font-weight: bold }
+.terminal-104160453-r13 { fill: #98a84b;font-weight: bold }
+.terminal-104160453-r14 { fill: #ff2c7a;font-weight: bold }
+    </style>
+
+    <defs>
+    <clipPath id="terminal-104160453-clip-terminal">
+      <rect x="0" y="0" width="1365.3999999999999" height="706.5999999999999" />
+    </clipPath>
+    <clipPath id="terminal-104160453-line-0">
+    <rect x="0" y="1.5" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-1">
+    <rect x="0" y="25.9" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-2">
+    <rect x="0" y="50.3" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-3">
+    <rect x="0" y="74.7" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-4">
+    <rect x="0" y="99.1" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-5">
+    <rect x="0" y="123.5" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-6">
+    <rect x="0" y="147.9" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-7">
+    <rect x="0" y="172.3" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-8">
+    <rect x="0" y="196.7" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-9">
+    <rect x="0" y="221.1" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-10">
+    <rect x="0" y="245.5" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-11">
+    <rect x="0" y="269.9" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-12">
+    <rect x="0" y="294.3" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-13">
+    <rect x="0" y="318.7" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-14">
+    <rect x="0" y="343.1" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-15">
+    <rect x="0" y="367.5" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-16">
+    <rect x="0" y="391.9" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-17">
+    <rect x="0" y="416.3" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-18">
+    <rect x="0" y="440.7" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-19">
+    <rect x="0" y="465.1" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-20">
+    <rect x="0" y="489.5" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-21">
+    <rect x="0" y="513.9" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-22">
+    <rect x="0" y="538.3" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-23">
+    <rect x="0" y="562.7" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-24">
+    <rect x="0" y="587.1" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-25">
+    <rect x="0" y="611.5" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-26">
+    <rect x="0" y="635.9" width="1366.4" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-104160453-line-27">
+    <rect x="0" y="660.3" width="1366.4" height="24.65"/>
+            </clipPath>
+    </defs>
+
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1383" height="755.6" rx="8"/><text class="terminal-104160453-title" fill="#c5c8c6" text-anchor="middle" x="691" y="27">carto&#160;demo</text>
+            <g transform="translate(26,22)">
+            <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
+            <circle cx="22" cy="0" r="7" fill="#febc2e"/>
+            <circle cx="44" cy="0" r="7" fill="#28c840"/>
+            </g>
+        
+    <g transform="translate(9, 41)" clip-path="url(#terminal-104160453-clip-terminal)">
+    
+    <g class="terminal-104160453-matrix">
+    <text class="terminal-104160453-r1" x="0" y="20" textLength="146.4" clip-path="url(#terminal-104160453-line-0)">$&#160;carto&#160;demo</text><text class="terminal-104160453-r2" x="1366.4" y="20" textLength="12.2" clip-path="url(#terminal-104160453-line-0)">
+</text><text class="terminal-104160453-r1" x="0" y="44.4" textLength="183" clip-path="url(#terminal-104160453-line-1)">Cartograph&#160;demo</text><text class="terminal-104160453-r2" x="183" y="44.4" textLength="622.2" clip-path="url(#terminal-104160453-line-1)">&#160;—&#160;a&#160;small&#160;synthetic&#160;lab,&#160;in&#160;a&#160;throwaway&#160;workspace.</text><text class="terminal-104160453-r2" x="1366.4" y="44.4" textLength="12.2" clip-path="url(#terminal-104160453-line-1)">
+</text><text class="terminal-104160453-r2" x="1366.4" y="68.8" textLength="12.2" clip-path="url(#terminal-104160453-line-2)">
+</text><text class="terminal-104160453-r3" x="0" y="93.2" textLength="12.2" clip-path="url(#terminal-104160453-line-3)">1</text><text class="terminal-104160453-r1" x="12.2" y="93.2" textLength="97.6" clip-path="url(#terminal-104160453-line-3)">.&#160;Ingest</text><text class="terminal-104160453-r3" x="134.2" y="93.2" textLength="12.2" clip-path="url(#terminal-104160453-line-3)">4</text><text class="terminal-104160453-r2" x="146.4" y="93.2" textLength="146.4" clip-path="url(#terminal-104160453-line-3)">&#160;projects&#160;·&#160;</text><text class="terminal-104160453-r3" x="292.8" y="93.2" textLength="24.4" clip-path="url(#terminal-104160453-line-3)">10</text><text class="terminal-104160453-r2" x="317.2" y="93.2" textLength="109.8" clip-path="url(#terminal-104160453-line-3)">&#160;files&#160;·&#160;</text><text class="terminal-104160453-r3" x="427" y="93.2" textLength="24.4" clip-path="url(#terminal-104160453-line-3)">15</text><text class="terminal-104160453-r2" x="451.4" y="93.2" textLength="134.2" clip-path="url(#terminal-104160453-line-3)">&#160;chunks&#160;in&#160;</text><text class="terminal-104160453-r3" x="585.6" y="93.2" textLength="36.6" clip-path="url(#terminal-104160453-line-3)">0.1</text><text class="terminal-104160453-r2" x="622.2" y="93.2" textLength="48.8" clip-path="url(#terminal-104160453-line-3)">&#160;s&#160;&#160;</text><text class="terminal-104160453-r4" x="671" y="93.2" textLength="451.4" clip-path="url(#terminal-104160453-line-3)">Word,&#160;PowerPoint,&#160;PDF,&#160;notebook,&#160;code</text><text class="terminal-104160453-r2" x="1366.4" y="93.2" textLength="12.2" clip-path="url(#terminal-104160453-line-3)">
+</text><text class="terminal-104160453-r2" x="1366.4" y="117.6" textLength="12.2" clip-path="url(#terminal-104160453-line-4)">
+</text><text class="terminal-104160453-r3" x="0" y="142" textLength="12.2" clip-path="url(#terminal-104160453-line-5)">2</text><text class="terminal-104160453-r1" x="12.2" y="142" textLength="61" clip-path="url(#terminal-104160453-line-5)">.&#160;Ask</text><text class="terminal-104160453-r5" x="97.6" y="142" textLength="597.8" clip-path="url(#terminal-104160453-line-5)">&quot;what&#160;Dice&#160;score&#160;did&#160;we&#160;get&#160;on&#160;the&#160;held-out&#160;set?&quot;</text><text class="terminal-104160453-r4" x="719.8" y="142" textLength="305" clip-path="url(#terminal-104160453-line-5)">answers&#160;cite&#160;their&#160;source</text><text class="terminal-104160453-r2" x="1366.4" y="142" textLength="12.2" clip-path="url(#terminal-104160453-line-5)">
+</text><text class="terminal-104160453-r6" x="36.6" y="166.4" textLength="414.8" clip-path="url(#terminal-104160453-line-6)">thesis/chapter3.docx&#160;§&#160;Results&#160;&#160;&#160;&#160;</text><text class="terminal-104160453-r2" x="451.4" y="166.4" textLength="817.4" clip-path="url(#terminal-104160453-line-6)">&#160;On&#160;the&#160;held-out&#160;set&#160;from&#160;site&#160;C&#160;the&#160;model&#160;reaches&#160;a&#160;Dice&#160;score&#160;of&#160;</text><text class="terminal-104160453-r3" x="1268.8" y="166.4" textLength="36.6" clip-path="url(#terminal-104160453-line-6)">0.8</text><text class="terminal-104160453-r2" x="1305.4" y="166.4" textLength="12.2" clip-path="url(#terminal-104160453-line-6)">…</text><text class="terminal-104160453-r2" x="1366.4" y="166.4" textLength="12.2" clip-path="url(#terminal-104160453-line-6)">
+</text><text class="terminal-104160453-r6" x="36.6" y="190.8" textLength="317.2" clip-path="url(#terminal-104160453-line-7)">thesis/defense.pptx&#160;slide&#160;</text><text class="terminal-104160453-r3" x="353.8" y="190.8" textLength="12.2" clip-path="url(#terminal-104160453-line-7)">3</text><text class="terminal-104160453-r2" x="451.4" y="190.8" textLength="183" clip-path="url(#terminal-104160453-line-7)">&#160;Held-out&#160;Dice&#160;</text><text class="terminal-104160453-r3" x="634.4" y="190.8" textLength="48.8" clip-path="url(#terminal-104160453-line-7)">0.87</text><text class="terminal-104160453-r1" x="695.4" y="190.8" textLength="12.2" clip-path="url(#terminal-104160453-line-7)">(</text><text class="terminal-104160453-r2" x="707.6" y="190.8" textLength="134.2" clip-path="url(#terminal-104160453-line-7)">BCE&#160;alone:&#160;</text><text class="terminal-104160453-r3" x="841.8" y="190.8" textLength="48.8" clip-path="url(#terminal-104160453-line-7)">0.81</text><text class="terminal-104160453-r1" x="890.6" y="190.8" textLength="12.2" clip-path="url(#terminal-104160453-line-7)">)</text><text class="terminal-104160453-r2" x="1366.4" y="190.8" textLength="12.2" clip-path="url(#terminal-104160453-line-7)">
+</text><text class="terminal-104160453-r6" x="36.6" y="215.2" textLength="402.6" clip-path="url(#terminal-104160453-line-8)">lab-notebook/analysis.ipynb&#160;cell&#160;</text><text class="terminal-104160453-r3" x="439.2" y="215.2" textLength="12.2" clip-path="url(#terminal-104160453-line-8)">1</text><text class="terminal-104160453-r6" x="451.4" y="215.2" textLength="12.2" clip-path="url(#terminal-104160453-line-8)">-</text><text class="terminal-104160453-r3" x="463.6" y="215.2" textLength="12.2" clip-path="url(#terminal-104160453-line-8)">3</text><text class="terminal-104160453-r2" x="475.8" y="215.2" textLength="390.4" clip-path="url(#terminal-104160453-line-8)">&#160;#&#160;Held-out&#160;evaluation&#160;scores&#160;=&#160;</text><text class="terminal-104160453-r7" x="866.2" y="215.2" textLength="97.6" clip-path="url(#terminal-104160453-line-8)">evaluate</text><text class="terminal-104160453-r1" x="963.8" y="215.2" textLength="12.2" clip-path="url(#terminal-104160453-line-8)">(</text><text class="terminal-104160453-r2" x="976" y="215.2" textLength="170.8" clip-path="url(#terminal-104160453-line-8)">model,&#160;heldout</text><text class="terminal-104160453-r1" x="1146.8" y="215.2" textLength="12.2" clip-path="url(#terminal-104160453-line-8)">)</text><text class="terminal-104160453-r2" x="1159" y="215.2" textLength="36.6" clip-path="url(#terminal-104160453-line-8)">&#160;#&#160;</text><text class="terminal-104160453-r3" x="1195.6" y="215.2" textLength="24.4" clip-path="url(#terminal-104160453-line-8)">96</text><text class="terminal-104160453-r2" x="1220" y="215.2" textLength="122" clip-path="url(#terminal-104160453-line-8)">&#160;images&#160;f…</text><text class="terminal-104160453-r2" x="1366.4" y="215.2" textLength="12.2" clip-path="url(#terminal-104160453-line-8)">
+</text><text class="terminal-104160453-r6" x="36.6" y="239.6" textLength="414.8" clip-path="url(#terminal-104160453-line-9)">thesis/chapter3.docx&#160;§&#160;Methods&#160;&#160;&#160;&#160;</text><text class="terminal-104160453-r2" x="451.4" y="239.6" textLength="219.6" clip-path="url(#terminal-104160453-line-9)">&#160;We&#160;train&#160;a&#160;U-Net&#160;</text><text class="terminal-104160453-r1" x="671" y="239.6" textLength="12.2" clip-path="url(#terminal-104160453-line-9)">(</text><text class="terminal-104160453-r2" x="683.2" y="239.6" textLength="73.2" clip-path="url(#terminal-104160453-line-9)">arXiv:</text><text class="terminal-104160453-r3" x="756.4" y="239.6" textLength="122" clip-path="url(#terminal-104160453-line-9)">1505.04597</text><text class="terminal-104160453-r1" x="878.4" y="239.6" textLength="12.2" clip-path="url(#terminal-104160453-line-9)">)</text><text class="terminal-104160453-r2" x="890.6" y="239.6" textLength="48.8" clip-path="url(#terminal-104160453-line-9)">&#160;on&#160;</text><text class="terminal-104160453-r3" x="939.4" y="239.6" textLength="36.6" clip-path="url(#terminal-104160453-line-9)">412</text><text class="terminal-104160453-r2" x="976" y="239.6" textLength="341.6" clip-path="url(#terminal-104160453-line-9)">&#160;fundus&#160;images&#160;from&#160;three&#160;s…</text><text class="terminal-104160453-r2" x="1366.4" y="239.6" textLength="12.2" clip-path="url(#terminal-104160453-line-9)">
+</text><text class="terminal-104160453-r2" x="1366.4" y="264" textLength="12.2" clip-path="url(#terminal-104160453-line-10)">
+</text><text class="terminal-104160453-r3" x="0" y="288.4" textLength="12.2" clip-path="url(#terminal-104160453-line-11)">3</text><text class="terminal-104160453-r1" x="12.2" y="288.4" textLength="85.4" clip-path="url(#terminal-104160453-line-11)">.&#160;Graph</text><text class="terminal-104160453-r2" x="97.6" y="288.4" textLength="512.4" clip-path="url(#terminal-104160453-line-11)">&#160;&#160;built&#160;from&#160;the&#160;files&#160;themselves,&#160;no&#160;LLM:</text><text class="terminal-104160453-r2" x="1366.4" y="288.4" textLength="12.2" clip-path="url(#terminal-104160453-line-11)">
+</text><text class="terminal-104160453-r1" x="36.6" y="312.8" textLength="134.2" clip-path="url(#terminal-104160453-line-12)">thesis&#160;&#160;&#160;&#160;&#160;</text><text class="terminal-104160453-r2" x="170.8" y="312.8" textLength="85.4" clip-path="url(#terminal-104160453-line-12)">&#160;cites&#160;</text><text class="terminal-104160453-r8" x="256.2" y="312.8" textLength="73.2" clip-path="url(#terminal-104160453-line-12)">arxiv:</text><text class="terminal-104160453-r7" x="329.4" y="312.8" textLength="122" clip-path="url(#terminal-104160453-line-12)">1505.04597</text><text class="terminal-104160453-r4" x="475.8" y="312.8" textLength="390.4" clip-path="url(#terminal-104160453-line-12)">←&#160;thesis/chapter3.docx&#160;§&#160;Methods</text><text class="terminal-104160453-r2" x="1366.4" y="312.8" textLength="12.2" clip-path="url(#terminal-104160453-line-12)">
+</text><text class="terminal-104160453-r1" x="36.6" y="337.2" textLength="134.2" clip-path="url(#terminal-104160453-line-13)">retina-seg&#160;</text><text class="terminal-104160453-r2" x="170.8" y="337.2" textLength="85.4" clip-path="url(#terminal-104160453-line-13)">&#160;cites&#160;</text><text class="terminal-104160453-r8" x="256.2" y="337.2" textLength="73.2" clip-path="url(#terminal-104160453-line-13)">arxiv:</text><text class="terminal-104160453-r7" x="329.4" y="337.2" textLength="122" clip-path="url(#terminal-104160453-line-13)">1505.04597</text><text class="terminal-104160453-r4" x="475.8" y="337.2" textLength="317.2" clip-path="url(#terminal-104160453-line-13)">←&#160;retina-seg/README.md:L1-</text><text class="terminal-104160453-r9" x="793" y="337.2" textLength="12.2" clip-path="url(#terminal-104160453-line-13)">4</text><text class="terminal-104160453-r2" x="1366.4" y="337.2" textLength="12.2" clip-path="url(#terminal-104160453-line-13)">
+</text><text class="terminal-104160453-r1" x="36.6" y="361.6" textLength="122" clip-path="url(#terminal-104160453-line-14)">retina-seg</text><text class="terminal-104160453-r10" x="170.8" y="361.6" textLength="12.2" clip-path="url(#terminal-104160453-line-14)">⇄</text><text class="terminal-104160453-r1" x="195.2" y="361.6" textLength="73.2" clip-path="url(#terminal-104160453-line-14)">thesis</text><text class="terminal-104160453-r4" x="292.8" y="361.6" textLength="280.6" clip-path="url(#terminal-104160453-line-14)">linked:&#160;both&#160;use&#160;arxiv:</text><text class="terminal-104160453-r9" x="573.4" y="361.6" textLength="122" clip-path="url(#terminal-104160453-line-14)">1505.04597</text><text class="terminal-104160453-r4" x="695.4" y="361.6" textLength="341.6" clip-path="url(#terminal-104160453-line-14)">,&#160;hf/retina-lab/unet-vessels</text><text class="terminal-104160453-r2" x="1366.4" y="361.6" textLength="12.2" clip-path="url(#terminal-104160453-line-14)">
+</text><text class="terminal-104160453-r2" x="1366.4" y="386" textLength="12.2" clip-path="url(#terminal-104160453-line-15)">
+</text><text class="terminal-104160453-r3" x="0" y="410.4" textLength="12.2" clip-path="url(#terminal-104160453-line-16)">4</text><text class="terminal-104160453-r1" x="12.2" y="410.4" textLength="97.6" clip-path="url(#terminal-104160453-line-16)">.&#160;Memory</text><text class="terminal-104160453-r2" x="109.8" y="410.4" textLength="817.4" clip-path="url(#terminal-104160453-line-16)">&#160;&#160;saved&#160;by&#160;one&#160;agent;&#160;the&#160;next&#160;session,&#160;in&#160;any&#160;client,&#160;starts&#160;with:</text><text class="terminal-104160453-r2" x="1366.4" y="410.4" textLength="12.2" clip-path="url(#terminal-104160453-line-16)">
+</text><text class="terminal-104160453-r4" x="36.6" y="434.8" textLength="12.2" clip-path="url(#terminal-104160453-line-17)">│</text><text class="terminal-104160453-r1" x="61" y="434.8" textLength="390.4" clip-path="url(#terminal-104160453-line-17)">Cartograph&#160;memory&#160;for&#160;retina-seg</text><text class="terminal-104160453-r2" x="1366.4" y="434.8" textLength="12.2" clip-path="url(#terminal-104160453-line-17)">
+</text><text class="terminal-104160453-r4" x="36.6" y="459.2" textLength="12.2" clip-path="url(#terminal-104160453-line-18)">│</text><text class="terminal-104160453-r1" x="61" y="459.2" textLength="109.8" clip-path="url(#terminal-104160453-line-18)">Decisions</text><text class="terminal-104160453-r2" x="1366.4" y="459.2" textLength="12.2" clip-path="url(#terminal-104160453-line-18)">
+</text><text class="terminal-104160453-r4" x="36.6" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">│</text><text class="terminal-104160453-r2" x="48.8" y="483.6" textLength="36.6" clip-path="url(#terminal-104160453-line-19)">&#160;-&#160;</text><text class="terminal-104160453-r1" x="85.4" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">[</text><text class="terminal-104160453-r3" x="97.6" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">1</text><text class="terminal-104160453-r1" x="109.8" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">]</text><text class="terminal-104160453-r2" x="122" y="483.6" textLength="634.4" clip-path="url(#terminal-104160453-line-19)">&#160;Use&#160;Dice&#160;+&#160;BCE&#160;loss:&#160;BCE&#160;alone&#160;missed&#160;thin&#160;vessels&#160;</text><text class="terminal-104160453-r1" x="756.4" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">(</text><text class="terminal-104160453-r3" x="768.6" y="483.6" textLength="48.8" clip-path="url(#terminal-104160453-line-19)">2026</text><text class="terminal-104160453-r2" x="817.4" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">-</text><text class="terminal-104160453-r3" x="829.6" y="483.6" textLength="24.4" clip-path="url(#terminal-104160453-line-19)">11</text><text class="terminal-104160453-r2" x="854" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">-</text><text class="terminal-104160453-r3" x="866.2" y="483.6" textLength="24.4" clip-path="url(#terminal-104160453-line-19)">23</text><text class="terminal-104160453-r1" x="890.6" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">)</text><text class="terminal-104160453-r2" x="1366.4" y="483.6" textLength="12.2" clip-path="url(#terminal-104160453-line-19)">
+</text><text class="terminal-104160453-r4" x="36.6" y="508" textLength="12.2" clip-path="url(#terminal-104160453-line-20)">│</text><text class="terminal-104160453-r1" x="61" y="508" textLength="244" clip-path="url(#terminal-104160453-line-20)">Rejected&#160;approaches&#160;</text><text class="terminal-104160453-r1" x="305" y="508" textLength="12.2" clip-path="url(#terminal-104160453-line-20)">(</text><text class="terminal-104160453-r1" x="317.2" y="508" textLength="134.2" clip-path="url(#terminal-104160453-line-20)">don&#x27;t&#160;retry</text><text class="terminal-104160453-r1" x="451.4" y="508" textLength="12.2" clip-path="url(#terminal-104160453-line-20)">)</text><text class="terminal-104160453-r2" x="1366.4" y="508" textLength="12.2" clip-path="url(#terminal-104160453-line-20)">
+</text><text class="terminal-104160453-r4" x="36.6" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">│</text><text class="terminal-104160453-r2" x="48.8" y="532.4" textLength="36.6" clip-path="url(#terminal-104160453-line-21)">&#160;-&#160;</text><text class="terminal-104160453-r1" x="85.4" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">[</text><text class="terminal-104160453-r3" x="97.6" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">2</text><text class="terminal-104160453-r1" x="109.8" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">]</text><text class="terminal-104160453-r2" x="122" y="532.4" textLength="634.4" clip-path="url(#terminal-104160453-line-21)">&#160;Random&#160;crops:&#160;they&#160;cut&#160;vessels&#160;at&#160;the&#160;image&#160;border&#160;</text><text class="terminal-104160453-r1" x="756.4" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">(</text><text class="terminal-104160453-r3" x="768.6" y="532.4" textLength="48.8" clip-path="url(#terminal-104160453-line-21)">2026</text><text class="terminal-104160453-r2" x="817.4" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">-</text><text class="terminal-104160453-r3" x="829.6" y="532.4" textLength="24.4" clip-path="url(#terminal-104160453-line-21)">11</text><text class="terminal-104160453-r2" x="854" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">-</text><text class="terminal-104160453-r3" x="866.2" y="532.4" textLength="24.4" clip-path="url(#terminal-104160453-line-21)">23</text><text class="terminal-104160453-r1" x="890.6" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">)</text><text class="terminal-104160453-r2" x="1366.4" y="532.4" textLength="12.2" clip-path="url(#terminal-104160453-line-21)">
+</text><text class="terminal-104160453-r11" x="36.6" y="556.8" textLength="427" clip-path="url(#terminal-104160453-line-22)">train.py&#160;just&#160;changed,&#160;so&#160;decision&#160;</text><text class="terminal-104160453-r12" x="463.6" y="556.8" textLength="12.2" clip-path="url(#terminal-104160453-line-22)">[</text><text class="terminal-104160453-r12" x="475.8" y="556.8" textLength="12.2" clip-path="url(#terminal-104160453-line-22)">1</text><text class="terminal-104160453-r12" x="488" y="556.8" textLength="12.2" clip-path="url(#terminal-104160453-line-22)">]</text><text class="terminal-104160453-r11" x="500.2" y="556.8" textLength="402.6" clip-path="url(#terminal-104160453-line-22)">&#160;is&#160;now&#160;flagged&#160;as&#160;possibly&#160;stale</text><text class="terminal-104160453-r2" x="1366.4" y="556.8" textLength="12.2" clip-path="url(#terminal-104160453-line-22)">
+</text><text class="terminal-104160453-r2" x="1366.4" y="581.2" textLength="12.2" clip-path="url(#terminal-104160453-line-23)">
+</text><text class="terminal-104160453-r3" x="0" y="605.6" textLength="12.2" clip-path="url(#terminal-104160453-line-24)">5</text><text class="terminal-104160453-r1" x="12.2" y="605.6" textLength="109.8" clip-path="url(#terminal-104160453-line-24)">.&#160;Plug&#160;in</text><text class="terminal-104160453-r1" x="146.4" y="605.6" textLength="207.4" clip-path="url(#terminal-104160453-line-24)">carto&#160;connect&#160;all</text><text class="terminal-104160453-r2" x="353.8" y="605.6" textLength="841.8" clip-path="url(#terminal-104160453-line-24)">&#160;adds&#160;it&#160;to&#160;Claude&#160;Code,&#160;Cursor,&#160;Codex,&#160;Gemini&#160;CLI,&#160;VS&#160;Code,&#160;Zed&#160;and&#160;</text><text class="terminal-104160453-r3" x="1195.6" y="605.6" textLength="12.2" clip-path="url(#terminal-104160453-line-24)">6</text><text class="terminal-104160453-r2" x="1207.8" y="605.6" textLength="61" clip-path="url(#terminal-104160453-line-24)">&#160;more</text><text class="terminal-104160453-r2" x="1366.4" y="605.6" textLength="12.2" clip-path="url(#terminal-104160453-line-24)">
+</text><text class="terminal-104160453-r2" x="1366.4" y="630" textLength="12.2" clip-path="url(#terminal-104160453-line-25)">
+</text><text class="terminal-104160453-r5" x="0" y="654.4" textLength="244" clip-path="url(#terminal-104160453-line-26)">✓&#160;That&#x27;s&#160;Cartograph.</text><text class="terminal-104160453-r2" x="244" y="654.4" textLength="280.6" clip-path="url(#terminal-104160453-line-26)">&#160;Now&#160;on&#160;your&#160;own&#160;files:</text><text class="terminal-104160453-r2" x="1366.4" y="654.4" textLength="12.2" clip-path="url(#terminal-104160453-line-26)">
+</text><text class="terminal-104160453-r1" x="36.6" y="678.8" textLength="146.4" clip-path="url(#terminal-104160453-line-27)">pip&#160;install&#160;</text><text class="terminal-104160453-r13" x="183" y="678.8" textLength="183" clip-path="url(#terminal-104160453-line-27)">&#x27;cartograph__v1</text><text class="terminal-104160453-r13" x="366" y="678.8" textLength="12.2" clip-path="url(#terminal-104160453-line-27)">[</text><text class="terminal-104160453-r13" x="378.2" y="678.8" textLength="48.8" clip-path="url(#terminal-104160453-line-27)">docs</text><text class="terminal-104160453-r13" x="427" y="678.8" textLength="12.2" clip-path="url(#terminal-104160453-line-27)">]</text><text class="terminal-104160453-r13" x="439.2" y="678.8" textLength="12.2" clip-path="url(#terminal-104160453-line-27)">&#x27;</text><text class="terminal-104160453-r2" x="451.4" y="678.8" textLength="195.2" clip-path="url(#terminal-104160453-line-27)">&#160;&#160;&#160;#&#160;PDF&#160;support</text><text class="terminal-104160453-r2" x="1366.4" y="678.8" textLength="12.2" clip-path="url(#terminal-104160453-line-27)">
+</text><text class="terminal-104160453-r1" x="36.6" y="703.2" textLength="170.8" clip-path="url(#terminal-104160453-line-28)">carto&#160;ingest&#160;~</text><text class="terminal-104160453-r7" x="207.4" y="703.2" textLength="12.2" clip-path="url(#terminal-104160453-line-28)">/</text><text class="terminal-104160453-r14" x="219.6" y="703.2" textLength="97.6" clip-path="url(#terminal-104160453-line-28)">research</text><text class="terminal-104160453-r1" x="317.2" y="703.2" textLength="24.4" clip-path="url(#terminal-104160453-line-28)">&#160;~</text><text class="terminal-104160453-r7" x="341.6" y="703.2" textLength="12.2" clip-path="url(#terminal-104160453-line-28)">/</text><text class="terminal-104160453-r14" x="353.8" y="703.2" textLength="48.8" clip-path="url(#terminal-104160453-line-28)">code</text><text class="terminal-104160453-r1" x="402.6" y="703.2" textLength="414.8" clip-path="url(#terminal-104160453-line-28)">&#160;&amp;&amp;&#160;carto&#160;connect&#160;all&#160;&amp;&amp;&#160;carto&#160;viz</text><text class="terminal-104160453-r2" x="1366.4" y="703.2" textLength="12.2" clip-path="url(#terminal-104160453-line-28)">
+</text>
+    </g>
+    </g>
+</svg>

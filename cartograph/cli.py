@@ -773,9 +773,9 @@ def agent_setup(rules_file: bool = typer.Option(False, "--write-rules",
 
 @app.command()
 def demo() -> None:
-    """See everything work in ~10s on a synthetic corpus — zero setup, your real workspace untouched."""
+    """See it work in a second on a synthetic lab: cited answers, the graph, memory. Your workspace is untouched."""
     from .demo import run_demo
-    console.print("[bold]Cartograph demo[/bold] — building a graph + steering answers on sample data.")
+    console.print("[bold]Cartograph demo[/bold] — a small synthetic lab, in a throwaway workspace.")
     run_demo(console)
 
 

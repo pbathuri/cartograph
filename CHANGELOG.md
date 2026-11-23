@@ -2,10 +2,20 @@
 
 All notable changes to Cartograph (`cartograph__v1`) are documented here. Versioning is semantic.
 
-## [Unreleased]
-- The mascot is named Moley, after the mole in *The Wind in the Willows*.
-- Moley is redrawn as a crisp SVG badge, a nerdy mole holding a brass lantern, with a new README banner,
-  social card and a favicon that still reads at 16 px. `scripts/brand.py` rebuilds every brand asset from code.
+## [2.0.2] — 2026-11-23
+- `carto demo` now shows what 2.0 does, in under a second on a synthetic lab: a question answered with
+  citations to a Word section, a slide and a notebook cell; two projects linked because they cite the same
+  paper; a decision saved to memory, briefed to the next session, and flagged stale when its file changes.
+  It cleans up after itself and leaves `CARTOGRAPH_HOME` as it was.
+- Memory finds the right project when an agent reports a symlinked working directory (for example `/tmp`
+  on macOS). Before, those memories were saved as global.
+- Hugging Face links at the end of a sentence (`huggingface.co/org/model.`) no longer keep the full stop,
+  so the same model is one entity across files and projects link correctly.
+- README: leads with cited answers from your own files, answers "why not CLAUDE.md or grep?", lists the
+  limits, and states exactly when the network is used. It also shows the demo above the fold.
+- Moley, Your Local Guide: the mascot is redrawn as a crisp SVG badge, a nerdy mole holding a brass lantern,
+  named after the mole in *The Wind in the Willows*. New README banner, social card and a favicon that still
+  reads at 16 px. `scripts/brand.py` rebuilds every brand asset from code, including the demo screenshot.
 
 ## [2.0.1] — 2026-11-23
 - `carto connect` no longer reports Claude Code as installed on every machine (its config lives in

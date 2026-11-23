@@ -33,6 +33,16 @@ def test_remember_recall_and_project_from_cwd(proj):
     assert again["duplicate"] and again["id"] == m["id"]
 
 
+def test_project_from_symlinked_cwd(proj, tmp_path):
+    d, store = proj
+    link = tmp_path / "link"
+    try:
+        link.symlink_to(d, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks not permitted here")
+    assert M.project_for(store, cwd=str(link / "sub")) == M.project_for(store, cwd=str(d))
+
+
 def test_supersede_keeps_history_and_flags_conflicts(proj):
     d, store = proj
     old = M.remember(store, "Store vectors in a numpy memmap index", "decision", cwd=str(d))

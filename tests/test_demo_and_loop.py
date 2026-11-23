@@ -19,6 +19,20 @@ def test_demo_corpus_is_multifield(tmp_path):
     assert {"ml_experiment", "web_frontend", "data_pipeline", "library"} <= set(st.fields)
 
 
+def test_carto_demo_shows_citations_graph_and_memory():
+    from rich.console import Console
+
+    from cartograph.demo import run_demo
+    before = os.environ.get("CARTOGRAPH_HOME")
+    con = Console(record=True, width=140)
+    run_demo(con)
+    out = con.export_text()
+    assert "chapter3.docx § Results" in out and "defense.pptx slide 3" in out
+    assert "retina-seg ⇄ thesis" in out and "arxiv:1505.04597" in out
+    assert "Cartograph memory for retina-seg" in out and "possibly stale" in out
+    assert os.environ.get("CARTOGRAPH_HOME") == before
+
+
 def test_mcp_record_use_closes_loop(tmp_path):
     home = tmp_path / "home"
     store = Store(home / "graph.sqlite")

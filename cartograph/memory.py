@@ -71,12 +71,15 @@ def project_for(store: Store, project: str | None = None, cwd: str | None = None
         if pid is not None:
             return pid
     if cwd:
-        target = os.path.normcase(os.path.normpath(str(Path(cwd).expanduser())))
+        norm = lambda p: os.path.normcase(os.path.normpath(p))  # noqa: E731
+        raw = str(Path(cwd).expanduser())
+        targets = {norm(raw), norm(os.path.realpath(raw))}   # agents may report a symlinked cwd (/tmp on macOS)
         best, best_len = None, -1
         with store.cursor() as c:
             for pid, path in c.execute("SELECT id, path FROM projects WHERE path IS NOT NULL AND path != ''"):
-                root = os.path.normcase(os.path.normpath(path))
-                if (target == root or target.startswith(root.rstrip(os.sep) + os.sep)) and len(root) > best_len:
+                root = norm(path)
+                inside = any(t == root or t.startswith(root.rstrip(os.sep) + os.sep) for t in targets)
+                if inside and len(root) > best_len:
                     best, best_len = pid, len(root)
         return best
     return None
