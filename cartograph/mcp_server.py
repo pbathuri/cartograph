@@ -32,10 +32,17 @@ TOOLS = [
      "params": {"top": "int? (default 8)"}},
     {"name": "personalize",
      "description": "THE personalization hook — call FIRST on any user prompt. Returns a steering brief "
-                    "(the user's persona/field focus, output guidance, and persona-ranked relevant "
-                    "snippets) to prepend so your answer fits this specific user and their work. Adapts "
-                    "as feedback accrues.",
+                    "(the user's persona/field focus, output guidance, the compass constellation of "
+                    "ambitions, ventures, inquiries, sparks, and sorties, and persona-ranked snippets) "
+                    "to prepend so your answer fits this specific user. They hold many directions at "
+                    "once; do not collapse them onto one project. Adapts as feedback accrues.",
      "params": {"prompt": "string", "top_k": "int? (default 6)", "max_chars": "int? context budget (0=unlimited)"}},
+    {"name": "constellation",
+     "description": "The user's compass: slow ambitions, warm ventures and inquiries, new sparks, "
+                    "temporary sorties and their residue, threads they returned to, and resting work "
+                    "that is memory rather than a to-do. Pass a prompt to mark which threads it touches, "
+                    "including quiet ones. Built by `carto compass --sync` from AutoLog.",
+     "params": {"prompt": "string?"}},
     {"name": "record_use",
      "description": "Close the learning loop: after answering, report which projects actually helped "
                     "(and which didn't) so the persona adapts to what the user responds to. Call when you "
@@ -134,6 +141,9 @@ def _dispatch(rid: Any, name: str, args: dict) -> str:
             return _resp(rid, build_brief(prompt, store, cfg, load_persona(store),
                                           top_k=int(args.get("top_k", 6)),
                                           max_chars=int(args.get("max_chars", 0))))
+        if name == "constellation":
+            from .compass import compass_for_prompt
+            return _resp(rid, compass_for_prompt(store, args.get("prompt") or ""))
         if name == "record_use":
             from .persona import record_feedback
             from .persona.profile import load_persona

@@ -10,6 +10,7 @@ Typical first run:
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -43,6 +44,38 @@ def version() -> None:
     console.print(f"workspace: {home()}  (override with CARTOGRAPH_HOME)")
 
 
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.|[\x00-\x1f\x7f]")
+
+
+def _clean_roots(roots: list[str]) -> tuple[list[str], list[str]]:
+    """Strip terminal escape junk (e.g. arrow keys typed at the prompt) and keep only real folders."""
+    good, bad = [], []
+    for r in roots or []:
+        s = _ANSI.sub("", str(r)).strip()
+        p = Path(s).expanduser() if s else None
+        if p and p.is_dir():
+            if str(p) not in good:
+                good.append(str(p))
+        else:
+            bad.append(str(r))
+    return good, bad
+
+
+def _clean_fields(fields_in: list[str]) -> tuple[list[str], list[str]]:
+    """Map free-text field names onto known field ids (case/space-insensitive, prefix match)."""
+    from .ingest import FIELD_TOKENS
+    known = list(FIELD_TOKENS)
+    good, bad = [], []
+    for f in fields_in or []:
+        k = _ANSI.sub("", str(f)).strip().lower().replace(" ", "_").replace("-", "_")
+        hit = k if k in known else next((x for x in known if x.startswith(k) or k in x.split("_")), None)
+        if hit and hit not in good:
+            good.append(hit)
+        elif not hit:
+            bad.append(str(f))
+    return good, bad
+
+
 @app.command()
 def init(
     roots: list[str] = typer.Option(None, "--root", help="Folder(s) to ingest. Repeatable."),
@@ -65,6 +98,12 @@ def init(
                           default="")
         if fr.strip():
             cfg.field_focus = [f.strip() for f in fr.split(",") if f.strip()]
+    cfg.roots, bad_roots = _clean_roots(cfg.roots)
+    for r in bad_roots:
+        console.print(f"[yellow]! skipped root (not a folder): {r!r}[/yellow]")
+    cfg.field_focus, bad_fields = _clean_fields(cfg.field_focus)
+    for f in bad_fields:
+        console.print(f"[yellow]! unknown field {f!r} ignored[/yellow]")
     p = save_config(cfg)
     _store()  # create schema
     console.print(f"\n[green]✓ workspace ready[/green]  config: {p}")
@@ -81,7 +120,9 @@ def ingest(
 ) -> None:
     """Build/refresh your graph from folders (incremental — only changed files reprocess)."""
     cfg = load_config()
-    targets = list(path) if path else cfg.roots
+    targets, missing = _clean_roots(list(path) if path else cfg.roots)
+    for m in missing:
+        console.print(f"[yellow]! skipping {m!r} — not a folder right now (unplugged drive?)[/yellow]")
     if not targets:
         console.print("[red]No folders.[/red] Pass a path or run `carto init` to set roots.")
         raise typer.Exit(1)
@@ -421,6 +462,43 @@ def prefs(set_: list[str] = typer.Option(None, "--set", help="Output preference 
     console.print("[bold]output preferences[/bold] (applied to every steering brief):")
     for k, v in (p.preferences or {"(none set)": "defaults apply"}).items():
         console.print(f"  {k} = {v}")
+
+
+@app.command()
+def compass(
+    sync: bool = typer.Option(False, "--sync", help="Fold new AutoLog summaries into the constellation."),
+    rebuild: bool = typer.Option(False, "--rebuild", help="Drop the map and sync again from the first summary."),
+    prompt: str = typer.Option("", "--prompt", help="Mark which directions this prompt touches."),
+    db: str = typer.Option("", "--db", help="ContextD sqlite path. Default: the AutoLog database."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Map of ambitions, ventures, inquiries, sparks, and temporary sorties.
+
+    Built so a model can hold many evolving directions at once. Quiet threads stay
+    in memory. Temporary work leaves a residue instead of becoming an identity.
+    Entertainment never becomes a direction. Sync reads AutoLog; the map is local.
+    """
+    from pathlib import Path
+
+    from .compass import compass_for_prompt, constellation, render_text, reset as reset_compass, sync as sync_compass
+    store = _store(read_only=not (sync or rebuild))
+    if rebuild:
+        reset_compass(store)
+        sync = True
+    if sync:
+        report = sync_compass(store, db=Path(db) if db else None, load_defaults=True)
+        console.print(
+            f"[green]✓ compass[/green] {report['directions']} directions · "
+            f"linked {report['observations_linked']} · "
+            f"{report.get('log_nodes', 0)} log nodes · "
+            f"{report.get('log_edges', 0)} reasoning edges · "
+            f"kept {report['life_skipped']} non-work summaries out"
+        )
+    data = compass_for_prompt(store, prompt) if prompt else constellation(store)
+    if json_out:
+        typer.echo(json.dumps(data, indent=2))
+        return
+    console.print(render_text(data))
 
 
 @app.command()
