@@ -38,9 +38,10 @@ Cartograph is the boring, dependable version:
   valid until they are superseded, and get flagged when the files they point at change.
 
 <table><tr>
-<td width="140"><img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/mascot.png" width="128" alt="Digby, the Cartograph mole"/></td>
-<td>Meet <b>Digby</b>, Cartograph's mole. He digs through your files so your agents don't have to,
-and his lamp only shines where there's evidence.</td>
+<td width="140"><img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/mascot.png" width="128" alt="Moley, the Cartograph mole"/></td>
+<td>Meet <b>Moley</b>, Cartograph's mole, named for the one in <i>The Wind in the Willows</i> who catches
+the scent of a home he'd forgotten and finds his way back to it. He digs through your files so your
+agents don't have to, and his lamp only shines where there's evidence.</td>
 </tr></table>
 
 ## Quickstart

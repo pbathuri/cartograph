@@ -2,6 +2,9 @@
 
 All notable changes to Cartograph (`cartograph__v1`) are documented here. Versioning is semantic.
 
+## [Unreleased]
+- The mascot is named Moley, after the mole in *The Wind in the Willows*.
+
 ## [2.0.1] — 2026-11-23
 - `carto connect` no longer reports Claude Code as installed on every machine (its config lives in
   `$HOME`); it now looks for `~/.claude.json`, `~/.claude/` or the `claude` command.
@@ -103,7 +106,7 @@ No LLM is needed to build any of it.
 - Entity hubs (papers, repos, models, datasets shared by several projects) are drawn as diamonds.
 - The map payload is cached until the graph file changes: the first load on a 6.5M-chunk graph takes
   seconds, later loads 10 ms. If the port is busy, the server moves to the next free one.
-- Meet Digby, the mole, on the map, in the README and on the social card.
+- Meet Moley, the mole, on the map, in the README and on the social card.
 
 ### Faster and cleaner
 - Keyword-only search no longer imports PyTorch to find out whether semantic search is installed. The first
