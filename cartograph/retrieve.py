@@ -7,6 +7,7 @@ Works in pure-FTS mode with zero ML installed; turns on semantic automatically o
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -52,7 +53,7 @@ def _semantic_chunk_ids(cfg: Config, query: str, top_k: int) -> list[int]:
     if not (available_semantic() and SemanticIndex.exists()):
         return []
     try:
-        if _INDEX is None:
+        if _INDEX is None or _INDEX.signature != SemanticIndex.current_signature():
             _INDEX = SemanticIndex(cfg)
         return _INDEX.search_chunk_ids(query, top_k=top_k)
     except Exception:
@@ -111,3 +112,127 @@ def retrieve(query: str, store: Store, cfg: Config, *, top_k: int = 10, rrf_k: i
         if nm and nm not in projects:
             projects.append(nm)
     return RetrieveResult(query=query, method=method, projects=projects, chunks=chunks)
+
+
+# ---------------------------------------------------------------------------------------------- context
+MODES = ("mix", "chunks", "projects", "graph", "memory")
+_STOP = {"what", "which", "where", "when", "with", "from", "that", "this", "have", "does", "about", "into",
+         "using", "used", "uses", "use", "project", "projects", "file", "files", "code", "show", "find",
+         "how", "the", "and", "for", "are", "any", "all", "my", "our", "your", "cite", "cites", "paper"}
+
+
+def tokens(text: str) -> int:
+    """Rough token count (~4 characters per token) used for budgets."""
+    return (len(text) + 3) // 4
+
+
+def _fit(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars]
+    for sep in ("\n\n", "\n", ". "):
+        j = cut.rfind(sep)
+        if j > max_chars * 0.6:
+            return cut[:j + (1 if sep == ". " else 0)].rstrip() + " …"
+    return cut.rstrip() + " …"
+
+
+def _dedupe(chunks: list[dict], threshold: float = 0.6) -> list[dict]:
+    """Drop chunks that mostly repeat a better-ranked chunk of the same file (overlapping windows)."""
+    kept: list[tuple[str, set]] = []
+    out = []
+    for ch in chunks:
+        toks = set(re.findall(r"\w{3,}", (ch.get("chunk_text") or "").lower()))
+        fp = ch.get("file_path")
+        if any(f == fp and len(toks & t) / max(1, min(len(toks), len(t))) >= threshold for f, t in kept):
+            continue
+        kept.append((fp, toks))
+        out.append(ch)
+    return out
+
+
+def _graph_facts(store: Store, query: str, limit: int) -> list[dict]:
+    from . import entities as E
+    terms = [t for t in re.findall(r"[\w.\-/]{3,}", query.lower()) if t not in _STOP]
+    seen, out = set(), []
+    for t in sorted(terms, key=len, reverse=True)[:6]:
+        for f in E.find(store, t, limit=limit):
+            key = (f["entity"], f.get("project"), f["relation"])
+            if key not in seen:
+                seen.add(key)
+                out.append(f)
+    out.sort(key=lambda f: (-f["files"], -f["mentions"]))
+    return out[:limit]
+
+
+def context(query: str, store: Store, cfg: Config, *, mode: str = "mix", max_tokens: int = 2000,
+            top_k: int = 8, project: str | None = None, cwd: str | None = None) -> dict:
+    """Everything an agent needs for `query`, under a hard token budget, every item citable.
+
+    mix      memories (decisions, rejected approaches...) + entity facts + code/doc chunks
+    chunks   hybrid-retrieved snippets only          projects  ranked projects with their best hit
+    graph    entity facts (deps, papers, repos...)   memory    agent memories only"""
+    if mode not in MODES:
+        raise ValueError(f"mode must be one of {', '.join(MODES)}")
+    budget = max(200, int(max_tokens)) * 4
+    used = 0
+    out: dict[str, Any] = {"query": query, "mode": mode, "max_tokens": int(max_tokens)}
+
+    if mode in ("mix", "memory") and store.has_table("memories"):
+        from . import memory as M
+        share = budget if mode == "memory" else budget // 5
+        mem = M.recall(store, query, project=project, cwd=cwd, limit=12, max_chars=share)
+        if not mem["memories"] and (project or cwd):
+            mem = M.recall(store, query, limit=12, max_chars=share)
+        items = [{k: m[k] for k in ("id", "kind", "text", "project", "created", "stale") if m.get(k)}
+                 for m in mem["memories"]]
+        out["memories"] = items
+        used += sum(len(m["text"]) + 40 for m in items)
+
+    if mode in ("mix", "graph"):
+        share = budget - used if mode == "graph" else budget // 6
+        facts, size = [], 0
+        for f in _graph_facts(store, query, limit=30 if mode == "graph" else 8):
+            line = len(json.dumps(f))
+            if size + line > share and facts:
+                break
+            facts.append(f)
+            size += line
+        out["facts"] = facts
+        used += size
+
+    if mode in ("mix", "chunks", "projects"):
+        res = retrieve(query, store, cfg, top_k=top_k * 2)
+        out["method"] = res.method
+        chunks = _dedupe(res.chunks)
+        if mode == "projects":
+            best: dict[str, dict] = {}
+            for ch in chunks:
+                nm = ch.get("project_name") or "?"
+                b = best.setdefault(nm, {"project": nm, "hits": 0, "best": ch.get("cite"), "score": ch["score"]})
+                b["hits"] += 1
+            out["projects"] = list(best.values())[:top_k]
+            used += len(json.dumps(out["projects"]))
+        else:
+            room = budget - used
+            picked = []
+            for ch in chunks[:top_k]:
+                if room < 160:
+                    break
+                text = _fit(ch.get("chunk_text") or "", min(room - 80, max(400, room // 2)))
+                picked.append({"cite": ch.get("cite"), "project": ch.get("project_name"),
+                               "score": ch.get("score"), "text": text})
+                room -= len(text) + 80
+            out["chunks"] = picked
+            used = budget - room
+    def size() -> int:
+        return tokens(json.dumps({k: v for k, v in out.items() if k in ("memories", "facts", "chunks", "projects")}))
+    while size() > max_tokens:                               # hard cap: drop lowest-ranked items last-in first
+        for key in ("chunks", "projects", "facts", "memories"):
+            if out.get(key):
+                out[key].pop()
+                break
+        else:
+            break
+    out["tokens"] = size()
+    return out

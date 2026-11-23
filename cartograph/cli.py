@@ -161,10 +161,23 @@ def index(full: bool = typer.Option(False, "--full", help="Re-embed every chunk 
           background: bool = typer.Option(False, "--background", "-b",
                                           help="Run detached (survives closing the terminal); log in ~/.cartograph/logs."),
           status: bool = typer.Option(False, "--status", help="Show progress of a running/finished build."),
-          watch: bool = typer.Option(False, "--watch", help="With --status: live progress bar until it finishes.")) -> None:
+          watch: bool = typer.Option(False, "--watch", help="With --status: live progress bar until it finishes."),
+          ann: bool = typer.Option(False, "--ann", help="(Re)build only the ANN accelerator over the rows embedded so far.")) -> None:
     """Build the semantic vector index (needs `pip install cartograph__v1[semantic]`). Re-run after ingest;
-    only chunks added since the last index are embedded, and an interrupted build resumes where it stopped."""
+    only chunks added since the last index are embedded, and an interrupted build resumes where it stopped.
+    Past 100k chunks an ANN layer (built automatically, NumPy-only) keeps queries fast on millions of chunks."""
     from .embed import available, build_index, index_status
+    if ann:
+        from . import ann as A
+        from .embed import _complete, building_dir
+        d = index_dir() if _complete(index_dir()) else building_dir()
+        if not _complete(d):
+            console.print("[red]no index yet[/red] — run [bold]carto index[/bold] first")
+            raise typer.Exit(1)
+        with console.status("[bold]building ANN…[/bold]") as s:
+            info = A.build(d, progress=lambda m: s.update(f"[bold]{m}[/bold]"))
+        console.print(f"[green]✓ ANN[/green] {info}" if "rows" in info else f"[yellow]{info['skipped']}[/yellow]")
+        return
     if status or watch:
         from .progress_view import show_index_status
         show_index_status(index_status, watch=watch, console=console)
@@ -198,10 +211,30 @@ def retrieve(
     query: str = typer.Argument(..., help="What to find."),
     top_k: int = typer.Option(8, "--top-k"),
     chunks: bool = typer.Option(False, "--chunks", help="Show snippets, not just project names."),
+    mode: str = typer.Option(None, "--mode", "-m", help="mix | chunks | graph | memory | projects (budgeted bundle)"),
+    max_tokens: int = typer.Option(2000, "--max-tokens", help="Hard budget for --mode output."),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Hybrid retrieval over your graph (semantic + keyword; semantic auto-on if indexed)."""
     from .retrieve import retrieve as _r
+    if mode:
+        from .retrieve import context
+        ctx = context(query, _store(read_only=True), load_config(), mode=mode, max_tokens=max_tokens,
+                      top_k=top_k, cwd=os.getcwd())
+        if json_out:
+            typer.echo(json.dumps(ctx, indent=2))
+            return
+        console.print(f"[bold]{mode}[/bold] · {ctx['tokens']}/{max_tokens} tokens · {ctx.get('method', '')}")
+        for m in ctx.get("memories") or []:
+            console.print(f"  [magenta]{m['kind']}[/magenta] {m['text'][:160]}" + (" [yellow](stale)[/yellow]" if m.get("stale") else ""))
+        for f in ctx.get("facts") or []:
+            console.print(f"  [cyan]{f['entity']}[/cyan] {f['relation']} [dim]{f.get('project', '')} · "
+                          f"{(f.get('evidence') or {}).get('cite', '')}[/dim]")
+        for p in ctx.get("projects") or []:
+            console.print(f"  [green]{p['project']}[/green] [dim]{p['hits']} hits · {p['best']}[/dim]")
+        for c in ctx.get("chunks") or []:
+            console.print(f"  [green]{c['cite']}[/green]\n    {c['text'][:200].strip()}")
+        return
     res = _r(query, _store(read_only=True), load_config(), top_k=top_k)
     if json_out:
         typer.echo(json.dumps(res.to_dict(), indent=2))
