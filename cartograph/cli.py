@@ -136,18 +136,20 @@ def ingest(
         n = store.prune_outside(all_roots, keep_names={_SCREEN})
         if n:
             console.print(f"[dim]removed {n} project(s) outside your configured roots[/dim]")
-    total = {"projects": 0, "files_indexed": 0, "chunks": 0}
+    total = {"projects": 0, "files_indexed": 0, "chunks": 0, "docs": 0, "docs_unsupported": 0}
     fields: dict = {}
     for t in targets:
         console.print(f"[bold]ingesting[/bold] {t} …")
         st = ingest_path(t, store, cfg, progress=lambda m: console.print(f"  {m}", style="dim"))
-        total["projects"] += st.projects
-        total["files_indexed"] += st.files_indexed
-        total["chunks"] += st.chunks
+        for k in total:
+            total[k] += getattr(st, k)
         for k, v in st.fields.items():
             fields[k] = fields.get(k, 0) + v
     console.print(f"\n[green]✓ ingested[/green] {total['projects']} projects · "
-                  f"{total['files_indexed']} files · {total['chunks']} chunks")
+                  f"{total['files_indexed']} files ({total['docs']} documents) · {total['chunks']} chunks")
+    if total["docs_unsupported"]:
+        console.print(f"  [yellow]{total['docs_unsupported']} PDFs skipped[/yellow] — no PDF reader installed: "
+                      "[bold]pip install \"cartograph__v1[docs]\"[/bold]")
     if fields:
         console.print("  fields: " + ", ".join(f"{k}({v})" for k, v in sorted(fields.items(), key=lambda x: -x[1])))
     console.print("  next: [bold]carto index[/bold] for semantic search, or [bold]carto viz[/bold] to explore")
