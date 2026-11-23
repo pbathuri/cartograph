@@ -13,6 +13,9 @@ All notable changes to Cartograph (`cartograph__v1`) are documented here. Versio
 - `improve` logs why a step failed and writes `reports/latest.json` after every step, so a killed run
   still leaves a record.
 - Apple-GPU builds use batch 128 (about 10% faster than 64 on an M-series Mac).
+- **Fresh `[semantic]` installs work again.** transformers 5.17+ removed an API the default nomic-embed
+  model calls (`'NomicBertModel' object has no attribute 'get_extended_attention_mask'`); the
+  `semantic` and `full` extras now require `transformers<5.17`.
 
 ## [2.0.2] — 2026-11-23
 
