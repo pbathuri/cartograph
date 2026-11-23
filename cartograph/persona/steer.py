@@ -188,6 +188,26 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
         guidance.append(f"Live context: the user is currently working in {where}"
                         + (f" on a '{cur['field']}' task" if cur.get("field") else "")
                         + " — make the answer continuous with what's on screen.")
+    constellation: dict = {"has_map": False}
+    try:
+        from ..compass import compass_for_prompt
+        constellation = compass_for_prompt(store, prompt)
+        if constellation.get("has_map") and constellation.get("guidance_line"):
+            guidance.append(constellation["guidance_line"])
+        reasoning = constellation.get("reasoning") or {}
+        chain = reasoning.get("chain") or []
+        if reasoning.get("has_chain") and chain:
+            latest = chain[-1]
+            delta = "; ".join(latest.get("delta") or [])[:180]
+            bit = "Continue from the latest log in the chain"
+            if delta:
+                bit += f": {delta}"
+            open_q = reasoning.get("open_questions") or []
+            if open_q:
+                bit += ". Still open: " + "; ".join(open_q[:2])[:180]
+            guidance.append(bit + ".")
+    except Exception:
+        constellation = {"has_map": False}
     # assemble context, optionally trimmed to a char budget (drop trailing snippets to fit)
     ctx, used, per = [], 0, 400
     if max_chars and pr["chunks"]:
@@ -209,6 +229,7 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
         "steer_confidence": pr.get("steer_confidence", 0.0),
         "relevant_context": ctx,
         "current_activity": activity,
+        "constellation": constellation,
         "output_guidance": guidance,
         "note": "Prepend this to the model's context. Field-weight steering works with zero ML; the "
                 "preference vector sharpens it once `carto index` is built and feedback accrues.",
