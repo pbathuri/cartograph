@@ -292,16 +292,40 @@ def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress
             if progress:
                 progress(f"embedded {n_emb}/{len(todo)} new chunks ({reused} reused, {resumed} resumed)")
     vecs.flush()
-    del vecs
+    del vecs, state, old_vecs                                 # Windows can't rename dirs with open maps
     (tmp / "progress.json").unlink(missing_ok=True)
-    old = out.parent / (out.name + ".old")
-    if old.exists():
-        shutil.rmtree(old)
-    out.rename(old)
-    tmp.rename(out)
-    shutil.rmtree(old, ignore_errors=True)
+    _swap_in(tmp, out)
     return {"vectors": len(ids), "embedded": int(len(todo)), "reused": reused, "resumed": resumed,
             "dim": dim, "dir": str(out)}
+
+
+def _swap_in(tmp: Path, out: Path, attempts: int = 10) -> None:
+    """Replace `out` with the finished `tmp`. On Windows a process that still maps the old index (an MCP
+    server, say) blocks the rename; retry briefly, then restore the old index and say what to do. The
+    finished build stays in place, so re-running `carto index` only has to swap."""
+    import gc
+    import shutil
+    old = out.parent / (out.name + ".old")
+    if old.exists():
+        shutil.rmtree(old, ignore_errors=True)
+    for i in range(attempts):
+        gc.collect()
+        try:
+            if out.exists():
+                out.rename(old)
+            try:
+                tmp.rename(out)
+            except OSError:
+                if old.exists() and not out.exists():
+                    old.rename(out)
+                raise
+            shutil.rmtree(old, ignore_errors=True)
+            return
+        except OSError:
+            if i == attempts - 1:
+                raise RuntimeError(f"the new index is complete in {tmp} but {out} is in use by another process "
+                                   "(close MCP servers / `carto viz`, then run `carto index` again to swap it in)")
+            time.sleep(0.5)
 
 
 class SemanticIndex:
