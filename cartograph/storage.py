@@ -69,6 +69,7 @@ class Store:
     def upsert_project(self, name: str, path: str, field: str = "") -> int:
         with self.cursor() as c:
             c.execute("INSERT OR IGNORE INTO projects(name, path, field) VALUES(?,?,?)", (name, path, field))
+            c.execute("UPDATE projects SET path=? WHERE name=? AND path IS NOT ?", (path, name, path))
             if field:
                 c.execute("UPDATE projects SET field=? WHERE name=? AND (field='' OR field IS NULL)", (field, name))
             return c.execute("SELECT id FROM projects WHERE name=?", (name,)).fetchone()[0]
@@ -104,6 +105,48 @@ class Store:
                 "SELECT ch.id AS chunk_id, ch.chunk_text, f.path AS file_path FROM chunks ch "
                 "JOIN files f ON f.id = ch.file_id WHERE f.project_id=? ORDER BY ch.id DESC LIMIT ?",
                 (project_id, limit)).fetchall()]
+
+    def delete_project(self, project_id: int) -> None:
+        """Remove a project with its files, chunks (FTS rows follow via trigger) and edges."""
+        with self.cursor() as c:
+            c.execute("DELETE FROM chunks WHERE file_id IN (SELECT id FROM files WHERE project_id=?)", (project_id,))
+            c.execute("DELETE FROM files WHERE project_id=?", (project_id,))
+            c.execute("DELETE FROM edges WHERE src_id=? OR dst_id=?", (project_id, project_id))
+            c.execute("DELETE FROM projects WHERE id=?", (project_id,))
+
+    @staticmethod
+    def _under(path: str, root: str) -> bool:
+        """Separator- and case-correct 'path is root or inside root' (works on Windows and POSIX)."""
+        import os
+        a = os.path.normcase(os.path.normpath(path))
+        b = os.path.normcase(os.path.normpath(root))
+        return a == b or a.startswith(b.rstrip(os.sep) + os.sep)
+
+    def prune_projects_under(self, root: str, keep_paths: set[str]) -> int:
+        """Delete projects stored at or under `root` whose folder is no longer a discovered project
+        (e.g. an old whole-folder blob after project discovery got finer). Returns how many were removed."""
+        import os
+        keep = {os.path.normcase(os.path.normpath(k)) for k in keep_paths}
+        with self.cursor() as c:
+            rows = c.execute("SELECT id, path FROM projects WHERE path IS NOT NULL AND path != ''").fetchall()
+        stale = [r["id"] for r in rows if self._under(r["path"], root)
+                 and os.path.normcase(os.path.normpath(r["path"])) not in keep]
+        for pid in stale:
+            self.delete_project(pid)
+        return len(stale)
+
+    def prune_outside(self, roots: list[str], keep_names: set[str] | None = None) -> int:
+        """Delete projects whose folder is not under any configured root (left over from an old config or
+        a folder that was moved away). Projects named in `keep_names` (e.g. live screen activity) stay."""
+        keep_names = keep_names or set()
+        with self.cursor() as c:
+            rows = c.execute("SELECT id, name, path FROM projects").fetchall()
+        stale = [r["id"] for r in rows
+                 if r["name"] not in keep_names and r["path"]
+                 and not any(self._under(r["path"], root) for root in roots)]
+        for pid in stale:
+            self.delete_project(pid)
+        return len(stale)
 
     def project_id_by_name(self, name: str) -> int | None:
         with self.cursor() as c:

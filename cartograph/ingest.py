@@ -152,26 +152,104 @@ def _is_ignored(path: Path, ignore: list[str]) -> bool:
     return any(ig in parts for ig in ignore)
 
 
-def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None) -> IngestStats:
+PROJECT_MARKERS = (".git", "pyproject.toml", "package.json", "setup.py", "Cargo.toml", "go.mod",
+                   "pom.xml", "build.gradle", "Project.toml", "DESCRIPTION", "lakefile.lean")
+# Folders that hold several projects by convention, even when none of them carries a marker.
+CONTAINER_NAMES = {"projects", "repos", "repositories", "references", "workspace", "workspaces"}
+MAX_PROJECT_DEPTH = 3
+
+
+def _subdirs(d: Path, ignore: list[str]) -> list[Path]:
+    try:
+        return sorted(x for x in d.iterdir() if x.is_dir() and not x.is_symlink()
+                      and not x.name.startswith(".") and not _is_ignored(x, ignore))
+    except OSError:
+        return []
+
+
+def _has_marker(d: Path) -> bool:
+    return any((d / m).exists() for m in PROJECT_MARKERS)
+
+
+def _marker_within(d: Path, levels: int, ignore: list[str]) -> bool:
+    """True if any subfolder up to `levels` deep is a marked project (so `d` is a container of projects)."""
+    if levels <= 0:
+        return False
+    return any(_has_marker(k) or _marker_within(k, levels - 1, ignore) for k in _subdirs(d, ignore))
+
+
+def discover_projects(root: Path, cfg: Config, *, max_depth: int = MAX_PROJECT_DEPTH) -> list[tuple[Path, bool]]:
+    """Find project folders under `root`. Returns (folder, recursive) pairs.
+
+    A folder is a project when it carries a marker (.git, pyproject.toml, ...). A folder is a CONTAINER —
+    descended into rather than ingested as one blob — when it holds marked projects within the remaining
+    depth, or has a conventional container name ("Projects", "References") and 2+ subfolders.
+    A container's own loose files become a shallow (non-recursive) project so nothing is dropped.
+    Without this, a folder of 37 cloned repos became a single 2M-chunk project.
+    """
+    extra = {n.lower() for n in getattr(cfg, "project_containers", []) or []}
+    names = CONTAINER_NAMES | extra
+
+    def is_container(d: Path, depth_left: int) -> bool:
+        if _has_marker(d):
+            return False
+        if _marker_within(d, depth_left, cfg.ignore):      # holds marked projects (even just one)
+            return True
+        return d.name.lower() in names and len(_subdirs(d, cfg.ignore)) >= 2
+
+    def walk(d: Path, depth: int) -> list[tuple[Path, bool]]:
+        if depth >= max_depth or not is_container(d, max_depth - depth):
+            return [(d, True)]
+        out: list[tuple[Path, bool]] = []
+        if any(p.is_file() and p.suffix.lower() in TEXT_EXT for p in d.iterdir()):
+            out.append((d, False))
+        for k in _subdirs(d, cfg.ignore):
+            out.extend(walk(k, depth + 1))
+        return out
+
+    if _has_marker(root):
+        return [(root, True)]
+    subdirs = _subdirs(root, cfg.ignore)
+    if len(subdirs) < 2:
+        return [(root, True)]
+    found: list[tuple[Path, bool]] = []
+    for d in subdirs:
+        found.extend(walk(d, 1))
+    return found
+
+
+def project_name(root: Path, proj: Path) -> str:
+    """Stable, collision-free name: the path relative to the ingest root (first-level folders keep their
+    plain name, so existing graphs keep their project names)."""
+    try:
+        rel = proj.relative_to(root)
+    except ValueError:
+        return proj.name
+    return proj.name if str(rel) in (".", "") else rel.as_posix()
+
+
+def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None, prune: bool = True) -> IngestStats:
     root = Path(root).expanduser().resolve()
     st = IngestStats()
     if not root.is_dir():
         return st
-    # Treat each immediate subdir that looks like a project as a project; else the root itself.
-    subdirs = [d for d in root.iterdir() if d.is_dir() and not _is_ignored(d, cfg.ignore)]
-    looks_like_container = len(subdirs) >= 2 and not (root / "pyproject.toml").exists() \
-        and not (root / "package.json").exists() and not (root / ".git").exists()
-    projects = subdirs if looks_like_container else [root]
+    projects = discover_projects(root, cfg)
+    if prune:
+        keep = {str(p) for p, _ in projects}
+        removed = store.prune_projects_under(str(root), keep)
+        if removed and progress:
+            progress(f"pruned {removed} stale project(s) under {root}")
     max_bytes = int(cfg.max_file_mb * 1_000_000)
-    for proj in projects:
-        files = [p for p in proj.rglob("*") if p.is_file() and p.suffix.lower() in TEXT_EXT
+    for proj, recursive in projects:
+        walker = proj.rglob("*") if recursive else proj.iterdir()
+        files = [p for p in walker if p.is_file() and p.suffix.lower() in TEXT_EXT
                  and not _is_ignored(p, cfg.ignore)]
         if not files:
             continue
         # Structural signals for field inference: extension histogram + manifest files present.
         exts: dict[str, int] = {}
         manifests: set[str] = set()
-        for p in proj.rglob("*"):
+        for p in (proj.rglob("*") if recursive else proj.iterdir()):
             if p.is_file() and not _is_ignored(p, cfg.ignore):
                 exts[p.suffix.lower()] = exts.get(p.suffix.lower(), 0) + 1
                 if p.name.lower() in MANIFEST_FIELD or p.name.lower() in ("setup.py", "pyproject.toml"):
@@ -184,7 +262,7 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None) -
         for p in files[:20]:
             blob += " " + _read(p)[:800]
         fld = infer_field(proj.name, blob, exts=exts, manifests=manifests, focus=cfg.field_focus)
-        pid = store.upsert_project(proj.name, str(proj), fld)
+        pid = store.upsert_project(project_name(root, proj), str(proj), fld)
         st.projects += 1
         st.fields[fld] = st.fields.get(fld, 0) + 1
         for p in files:
