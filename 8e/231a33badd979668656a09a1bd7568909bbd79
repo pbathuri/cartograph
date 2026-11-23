@@ -1,0 +1,29 @@
+cartograph/cli.py
+  s_9597705f0f5f64::t_5905462880c626 682-698
+CHANGELOG.md
+  s_9597705f0f5f64::t_f279fcdf34194f 61-83
+cartograph/bench.py
+  s_9597705f0f5f64::t_22bdbf0637ad48 1-83,111,114,116-117,137-370,378-398
+  s_9597705f0f5f64::t_7b7dc3bd4937fc 371-377
+  s_9597705f0f5f64::t_3668727e79d8bd 84-110,112-113,115,118-136
+cartograph/retrieve.py
+  s_9597705f0f5f64::t_65c08c90ca7530 22-24,26-27,29-31
+tests/test_bench.py
+  s_9597705f0f5f64::t_83c40079272ac2 1-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8e231a33badd979668656a09a1bd7568909bbd79",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
