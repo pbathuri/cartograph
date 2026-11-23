@@ -208,11 +208,59 @@ def retrieve(
     console.print(f"[bold]{res.method}[/bold] — {len(res.projects)} projects")
     if chunks:
         for c in res.chunks:
-            console.print(f"[cyan]{c.get('project_name','')}[/cyan] [dim]{c.get('file_path','')}[/dim]")
+            console.print(f"[cyan]{c.get('project_name','')}[/cyan] [dim]{c.get('cite') or c.get('file_path','')}[/dim]")
             console.print(f"  {(c.get('chunk_text','') or '')[:160].strip()}")
     else:
         for p in res.projects:
             console.print(f"  {p}")
+
+
+@app.command()
+def entities(
+    project: str = typer.Argument(None, help="Describe one project (what it depends on, cites, links to)."),
+    find: str = typer.Option(None, "--find", "-f", help="Which projects use/cite this (e.g. pydantic, 1706.03762)."),
+    kind: str = typer.Option(None, "--kind", help="package | paper | repo | model | dataset"),
+    limit: int = typer.Option(25, "--limit"),
+    backfill: bool = typer.Option(False, "--backfill", help="Extract entities for every chunk already in the graph."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Deterministic facts from your files — dependencies, imports, papers, repos, models — with evidence."""
+    from . import entities as E
+    if backfill:
+        store = _store()
+        with console.status("[bold]reading every chunk for entities…[/bold]") as s:
+            out = E.backfill(store, progress=lambda n: s.update(f"[bold]{n:,} chunks read…[/bold]"))
+        console.print(f"[green]✓[/green] {out['entities']:,} entities · {out['facts']:,} facts · "
+                      f"{out['links']} project links from {out['chunks']:,} chunks")
+        return
+    store = _store(read_only=True)
+    if find:
+        rows, related = E.find(store, find, kind=kind, limit=limit), []
+    elif project:
+        pid = store.project_id_by_name(project)
+        if pid is None:
+            console.print(f"[red]no project named {project!r}[/red]")
+            raise typer.Exit(1)
+        rows, related = E.project_entities(store, pid, kind=kind, limit=limit), E.related_projects(store, pid)
+    else:
+        console.print(E.counts(store))
+        console.print("give a PROJECT or --find NAME (run [bold]carto entities --backfill[/bold] once on an older graph)")
+        return
+    if json_out:
+        typer.echo(json.dumps({"facts": rows, "related": related}, indent=2))
+        return
+    from rich.table import Table
+    t = Table(box=None, header_style="bold")
+    for col in (["project"] if find else []) + ["entity", "relation", "files", "conf", "seen", "evidence"]:
+        t.add_column(col, overflow="fold")
+    for r in rows:
+        seen = r["first_seen"] if r["first_seen"] == r["last_seen"] else f"{r['first_seen']} → {r['last_seen']}"
+        cells = [r.get("project") or ""] if find else []
+        t.add_row(*cells, r["entity"], r["relation"], str(r["files"]), f"{r['confidence']:.2f}", seen or "",
+                  (r.get("evidence") or {}).get("cite", ""))
+    console.print(t)
+    for x in related[:5]:
+        console.print(f"  [magenta]↔ {x['project']}[/magenta] [dim]score {x['score']} via {', '.join(x['via'][:4])}[/dim]")
 
 
 @app.command()

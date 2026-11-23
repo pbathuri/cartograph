@@ -85,8 +85,18 @@ TOOLS = [
                     "when-to-try, frontier papers/repos the scout pulled for the user's active topics, and "
                     "related projects from the user's graph. Use when planning an implementation.",
      "schema": _obj({"prompt": _d(_STR, "The task or question.")}, ("prompt",))},
+    {"name": "entities",
+     "description": "Facts read deterministically from the user's files, each with evidence (a citable "
+                    "chunk), extractor, confidence and first/last seen: dependencies, imports, cited papers "
+                    "(DOI/arXiv), GitHub repos, Hugging Face models/datasets. Give `find` to see which "
+                    "projects use/cite something (e.g. 'pydantic', '1706.03762'); give `project` to list "
+                    "what one project depends on and which projects it shares entities with.",
+     "schema": _obj({"find": _d(_STR, "Entity name or fragment to look up across projects."),
+                     "project": _d(_STR, "Project name to describe."),
+                     "kind": _d(_STR, "Restrict to one kind.", enum=["package", "paper", "repo", "model", "dataset"]),
+                     "limit": _d(_INT, "Max facts (default 20).", minimum=1, maximum=200)})},
     {"name": "graph_stats",
-     "description": "Counts in your graph (projects/files/chunks/edges) and the semantic index state.",
+     "description": "Counts in your graph (projects/files/chunks/edges/entities) and the semantic index state.",
      "schema": _obj({})},
 ]
 _BY_NAME = {t["name"]: t for t in TOOLS}
@@ -196,7 +206,21 @@ def _run(rid: Any, name: str, args: dict) -> str:
     if name == "graph_stats":
         from .embed import index_status
         st = index_status()
-        return _resp(rid, {**store.stats(), "index": {k: st.get(k) for k in ("state", "done", "total", "running")}})
+        from .entities import counts
+        return _resp(rid, {**store.stats(), **counts(store),
+                           "index": {k: st.get(k) for k in ("state", "done", "total", "running")}})
+    if name == "entities":
+        from . import entities as E
+        limit, kind = int(args.get("limit", 20)), args.get("kind") or None
+        if args.get("find"):
+            return _resp(rid, {"facts": E.find(store, args["find"], kind=kind, limit=limit)})
+        if args.get("project"):
+            pid = store.project_id_by_name(args["project"])
+            if pid is None:
+                return _resp(rid, error=f"no project named {args['project']!r}")
+            return _resp(rid, {"facts": E.project_entities(store, pid, kind=kind, limit=limit),
+                               "related": E.related_projects(store, pid)})
+        return _resp(rid, error="give `find` or `project`")
     if name in ("retrieve_context", "relevant_projects"):
         from .retrieve import retrieve
         query = args.get("query", "")

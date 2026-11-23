@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import documents
+from . import documents, entities
 from .config import Config
 from .documents import DOC_EXT, Section
 from .storage import Store
@@ -22,6 +22,7 @@ TEXT_EXT = {
     ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".css", ".scss", ".vue", ".svelte",
     ".ipynb",
 }
+TEXT_NAMES = {"dockerfile", "makefile", "gemfile", "go.mod", "procfile", "justfile", "cmakelists.txt"}
 
 # Lightweight field inference from path/content tokens — extend in config.field_focus or here.
 FIELD_TOKENS = {
@@ -63,6 +64,8 @@ class IngestStats:
     chunks: int = 0
     docs: int = 0                 # PDFs / Office / EPUB / HTML indexed this run
     docs_unsupported: int = 0     # PDFs seen but skipped because no PDF backend is installed
+    facts: int = 0                # entity facts (re)extracted from changed files
+    links: int = 0                # project links from shared entities after this run
     fields: dict[str, int] = field(default_factory=dict)
 
 
@@ -142,7 +145,7 @@ def wanted(p: Path) -> bool:
     if p.name.startswith(("~$", ".~")):                 # Office/LibreOffice lock files
         return False
     ext = p.suffix.lower()
-    return ext in TEXT_EXT or documents.supported(p)
+    return ext in TEXT_EXT or p.name.lower() in TEXT_NAMES or documents.supported(p)
 
 
 # Strong structural signals — a file extension or manifest is worth several token hits.
@@ -324,6 +327,7 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None, p
         pid = store.upsert_project(project_name(root, proj), str(proj), fld)
         st.projects += 1
         st.fields[fld] = st.fields.get(fld, 0) + 1
+        local = None
         for p in files:
             st.files_seen += 1
             is_doc = p.suffix.lower() in DOC_EXT
@@ -348,12 +352,20 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None, p
             if pairs:
                 store.add_chunks(fid, [t for t, _ in pairs], locators=[loc for _, loc in pairs])
                 st.chunks += len(pairs)
+            if local is None:
+                local = entities.local_names(str(f) for f in files)
+            with store.cursor() as c:
+                saved = [(r[0], r[1]) for r in c.execute(
+                    "SELECT id, chunk_text FROM chunks WHERE file_id=? ORDER BY ordinal", (fid,))]
+            st.facts += entities.record_file(store, fid, str(p), saved, local)
             st.files_indexed += 1
             if is_doc:
                 st.docs += 1
             if progress and st.files_indexed % 200 == 0:
                 progress(f"{st.files_indexed} files, {st.chunks} chunks ...")
     _link_shared_fields(store)
+    if st.files_indexed:
+        st.links = entities.link_projects(store)
     return st
 
 
