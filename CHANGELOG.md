@@ -3,6 +3,10 @@
 All notable changes to Cartograph (`cartograph__v1`) are documented here. Versioning is semantic.
 
 ## [2.0.2] — 2026-11-23
+
+- **Listed in the official MCP Registry** as `io.github.pbathuri/cartograph` (`server.json`; the release
+  workflow publishes it after PyPI via GitHub OIDC). New `cartograph__v1` command alias so
+  `uvx cartograph__v1 mcp-server` works. A `Dockerfile` and `glama.json` for Glama and container use.
 - `carto demo` now shows what 2.0 does, in under a second on a synthetic lab: a question answered with
   citations to a Word section, a slide and a notebook cell; two projects linked because they cite the same
   paper; a decision saved to memory, briefed to the next session, and flagged stale when its file changes.

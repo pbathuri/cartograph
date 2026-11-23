@@ -1,3 +1,4 @@
+<!-- mcp-name: io.github.pbathuri/cartograph -->
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/banner.svg" alt="Cartograph, with Moley, Your Local Guide: your files, cited. Your agents, remembering." width="100%"/>

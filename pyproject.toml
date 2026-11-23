@@ -56,6 +56,8 @@ dev = ["pytest>=7", "numpy>=1.24", "ruff>=0.6", "pypdf>=4.0"]  # numpy: learned-
 
 [project.scripts]
 carto = "cartograph.cli:app"
+# Same CLI under the PyPI name, so `uvx cartograph__v1 mcp-server` (how MCP Registry clients launch it) resolves.
+cartograph__v1 = "cartograph.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/pbathuri/cartograph"

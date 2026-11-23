@@ -31,3 +31,37 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true     # idempotent: re-running a tag never fails on an already-published version
+
+  # List the release in the official MCP Registry (registry.modelcontextprotocol.io) as io.github.pbathuri/cartograph.
+  # Auth is GitHub OIDC, so no secret. The registry checks the `mcp-name:` marker in the PyPI description (README.md),
+  # so it must run after PyPI serves the new version.
+  mcp-registry:
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    env:
+      MCP_PUBLISHER_VERSION: v1.8.15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: sigstore/cosign-installer@v3
+      - name: Download and verify mcp-publisher
+        run: |
+          set -euo pipefail
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          base="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl -fsSL -o "$archive" "$base/$archive"
+          curl -fsSL -o "$archive.sigstore.json" "$base/$archive.sigstore.json"
+          cosign verify-blob --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" "$archive"
+          tar xzf "$archive" mcp-publisher
+      - name: Stamp the tag version into server.json
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          jq --arg v "$v" '.version = $v | .packages[0].version = $v' server.json > s.tmp && mv s.tmp server.json
+          for i in $(seq 1 30); do
+            curl -fsS "https://pypi.org/pypi/cartograph__v1/$v/json" >/dev/null && exit 0
+            sleep 10
+          done
+          echo "PyPI never served $v"; exit 1
+      - run: ./mcp-publisher login github-oidc
+      - run: ./mcp-publisher publish
