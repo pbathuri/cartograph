@@ -1,0 +1,38 @@
+cartograph/entities.py
+  s_9597705f0f5f64::t_8071d00e31758a 1-68,105-112,124-126,130-131,143-420,423
+  s_9597705f0f5f64::t_51755213d02c4a 69-104,113-123,127-129,132-142
+  s_9597705f0f5f64::t_cb43f1c418df4b 421-422,424-437
+cartograph/ingest.py
+  s_9597705f0f5f64::t_fddcd0581a6f4e 11
+  s_9597705f0f5f64::t_c0f49b575e3110 67-68
+  s_9597705f0f5f64::t_6c2fc1ad96eea1 330
+  s_9597705f0f5f64::t_d9563db18eac5f 355-360
+  s_9597705f0f5f64::t_47a79394fd0986 148
+  s_9597705f0f5f64::t_01221163c71a87 367-368
+  s_9597705f0f5f64::t_df2270a83a03b0 25
+cartograph/cli.py
+  s_9597705f0f5f64::t_95b8a2f72bdff9 211,218-263
+  s_9597705f0f5f64::t_132879e277ebe6 264-265
+tests/test_entities.py
+  s_9597705f0f5f64::t_a007c0f5515d92 1-144
+cartograph/mcp_server.py
+  s_9597705f0f5f64::t_7fbbf05b16e8c4 88-97,99,209-223
+cartograph/storage.py
+  s_9597705f0f5f64::t_f5689142342622 43-56,81,155,215-222,274-275
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9bd3bfdbc527f0965c5863379aea1edbe84923f",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
