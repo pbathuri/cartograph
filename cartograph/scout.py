@@ -46,12 +46,61 @@ def slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")[:60] or "topic"
 
 
+_BASE_LEXICON = {
+    "algorithm", "model", "modeling", "modelling", "kernel", "optimization", "optimisation", "regression",
+    "neural", "learning", "simulation", "dynamics", "estimation", "inference", "statistics", "statistical",
+    "probability", "stochastic", "bayesian", "monte carlo", "numerical", "solver", "matrix", "linear algebra",
+    "graph", "network", "signal", "filter", "transform", "fourier", "wavelet", "compiler", "parallel",
+    "distributed", "quantum", "protein", "molecular", "cell", "drug", "pharmacokinetic", "pharmacokinetics",
+    "retina", "ocular", "cornea", "endothelium", "endothelial", "sedimentation", "rheology", "fpga", "verilog",
+    "circuit", "embedded", "dataset", "benchmark", "retrieval", "embedding", "transformer", "llm", "agent",
+    "reinforcement", "diffusion", "attention", "classification", "segmentation", "detection", "forecasting",
+    "time series", "volatility", "portfolio", "derivatives", "option pricing", "stochastic calculus",
+    "factor model", "risk", "econometrics", "control", "physics", "chemistry", "biology", "genomics",
+    "eye tracking", "eog", "eeg", "blink", "spmv", "sparse", "gpu", "cuda", "hpc", "mpi", "openmp",
+    "convolution", "impulse response", "differential equation", "pde", "ode", "finite element",
+    "proof", "theorem", "lean", "topology", "combinatorics", "cryptography", "compression", "quantization",
+}
+
+
+def _lexicon() -> set[str]:
+    lex = set(_BASE_LEXICON)
+    try:
+        from .elite.methods import METHODS
+        for m in METHODS.values():
+            lex.update(k.lower() for k in m["kw"])
+    except Exception:
+        pass
+    try:
+        from .ingest import FIELD_TOKENS
+        for toks in FIELD_TOKENS.values():
+            lex.update(t.lower() for t in toks if len(t) >= 4)
+    except Exception:
+        pass
+    return lex
+
+
+_LEX: set[str] | None = None
+
+
+def is_technical(topic: str) -> bool:
+    """A topic leaves the machine only if it names a technical concept (whole-word lexicon match).
+    Project codenames, games, people, places and personal questions don't match and are dropped."""
+    global _LEX
+    if _LEX is None:
+        _LEX = _lexicon()
+    low = topic.lower()
+    return any(re.search(rf"(?<![a-z]){re.escape(k)}s?(?![a-z])", low) for k in _LEX)
+
+
 def _clean_topic(t: str) -> str | None:
     t = re.sub(r"\s+", " ", str(t)).strip()
     low = t.lower()
     if not (4 <= len(t) <= 60) or "@" in t or "/" in t or "\\" in t:
         return None
-    if re.search(r"\.(py|md|pdf|zip|json|csv|ipynb|sh|txt)\b", low) or re.search(r"\d{4}-\d{2}", low):
+    if re.search(r"\.[a-z0-9]{1,5}$", low) or re.search(r"\d{4}-\d{2}", low):   # filenames, dated items
+        return None
+    if not is_technical(t):
         return None
     if sum(ch.isdigit() for ch in t) > len(t) // 3:
         return None
@@ -85,8 +134,9 @@ def gather_topics(store: Store, cfg: Config, *, days: float = 14, limit: int = 8
         pass
     out: list[str] = []
     seen: set[str] = set()
-    for t in manual + [t for t, n in counts.most_common(80) if n >= 2]:
-        ct = _clean_topic(t)
+    manual_set = set(manual)
+    for t in manual + [t for t, n in counts.most_common(200) if n >= 2]:
+        ct = str(t).strip() if t in manual_set else _clean_topic(t)      # your own topics are kept as given
         if not ct or ct.lower() in exclude or slug(ct) in seen:
             continue
         seen.add(slug(ct))

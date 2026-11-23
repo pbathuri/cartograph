@@ -140,3 +140,12 @@ def test_brief_carries_hints_and_respects_snippet_cap(tmp_path):
     for c in b["relevant_context"]:
         per[c["project"]] = per.get(c["project"], 0) + 1
     assert max(per.values()) <= 2
+
+
+def test_scout_never_sends_personal_or_codename_topics():
+    from cartograph.scout import _clean_topic
+    for bad in ["expected behavior of men paying on dates in Peru", "Cao Cao's Conquests", "ResumeForge",
+                "iu-demo", "mobility-introduction.tsx", "NextThread"]:
+        assert _clean_topic(bad) is None, bad
+    for good in ["CUDA kernel fusion", "Kalman filter", "time series forecasting", "Blink detection"]:
+        assert _clean_topic(good) == good
