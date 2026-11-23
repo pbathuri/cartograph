@@ -3,93 +3,439 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Cartograph — your knowledge graph</title>
-<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<title>Cartograph Atlas</title>
+<link rel="icon" href="/favicon.png"/>
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --ink:#e7e9ee; --dim:#9aa3b2; --accent:#5ea0ff; --hit:#ffd166; }
-  * { box-sizing:border-box; } html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
-    font-family:Segoe UI, system-ui, Arial, sans-serif; }
-  #bar { display:flex; gap:12px; align-items:center; padding:10px 16px; background:var(--panel);
-    border-bottom:1px solid #232733; position:sticky; top:0; z-index:5; }
-  #bar h1 { font-size:16px; margin:0; font-weight:700; letter-spacing:.3px; }
-  #bar h1 span { color:var(--accent); }
-  #q { flex:1; max-width:560px; padding:9px 12px; border-radius:8px; border:1px solid #2b303c;
-    background:#0d0f14; color:var(--ink); font-size:14px; }
-  #stats { color:var(--dim); font-size:12.5px; }
-  #wrap { display:flex; height:calc(100vh - 53px); }
-  #net { flex:1; }
-  #side { width:340px; background:var(--panel); border-left:1px solid #232733; overflow:auto; padding:14px; }
-  #side h2 { font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.5px; margin:4px 0 8px; }
-  .hitcard { background:#0d0f14; border:1px solid #232733; border-radius:8px; padding:10px; margin-bottom:8px; }
-  .hitcard .p { color:var(--accent); font-size:12.5px; font-weight:600; }
-  .hitcard .f { color:var(--dim); font-size:11px; word-break:break-all; margin:2px 0 6px; }
-  .hitcard .t { font-size:12px; color:#c8cdd8; white-space:pre-wrap; max-height:88px; overflow:hidden; }
-  .pill { display:inline-block; background:#0d0f14; border:1px solid #2b303c; color:var(--dim);
-    padding:3px 8px; border-radius:999px; font-size:11px; margin:0 6px 6px 0; }
-  .empty { color:var(--dim); font-size:13px; line-height:1.5; }
+  :root { --bg:#0a0e18; --panel:rgba(18,23,36,.92); --line:#232a3b; --ink:#e8ebf2; --dim:#8f99ad;
+    --gold:#ffd166; --blue:#5ea0ff; --teal:#3fb8af; --red:#ff7b72; --green:#7ee787; --violet:#d2a8ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--ink);
+    font:14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif; }
+  canvas#map { position:fixed; inset:0; width:100vw; height:100vh; cursor:grab; display:block; }
+  canvas#map.dragging { cursor:grabbing; }
+  .glass { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); box-shadow:0 10px 40px rgba(0,0,0,.35); }
+  #brand { position:fixed; top:14px; left:14px; display:flex; gap:12px; align-items:center; padding:8px 14px 8px 8px; }
+  #brand img { width:44px; height:44px; border-radius:50%; }
+  #brand b { font-size:16px; letter-spacing:.2px; } #brand b span { color:var(--gold); }
+  #stats { color:var(--dim); font-size:12px; }
+  #searchbar { position:fixed; top:14px; left:50%; transform:translateX(-50%); width:min(620px, calc(100vw - 760px));
+    min-width:320px; padding:6px; display:flex; gap:6px; align-items:center; }
+  #q { flex:1; padding:10px 12px; border-radius:10px; border:1px solid #2b3347; background:#0b0f19; color:var(--ink);
+    font-size:14px; outline:none; }
+  #q:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(255,209,102,.15); }
+  select, button { background:#0b0f19; color:var(--ink); border:1px solid #2b3347; border-radius:9px; padding:8px 10px;
+    font:inherit; font-size:12.5px; cursor:pointer; }
+  button:hover, select:hover { border-color:#3b4560; }
+  #side { position:fixed; top:14px; right:14px; bottom:14px; width:410px; display:flex; flex-direction:column; overflow:hidden; }
+  #tabs { display:flex; gap:4px; padding:8px 8px 0; border-bottom:1px solid var(--line); }
+  #tabs button { border:none; background:none; color:var(--dim); padding:8px 10px 10px; border-radius:8px 8px 0 0; }
+  #tabs button.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--gold); }
+  #pane { flex:1; overflow:auto; padding:12px 14px 18px; }
+  h3 { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.7px; margin:16px 0 8px; font-weight:600; }
+  h3:first-child { margin-top:2px; }
+  .card { background:#0b0f19; border:1px solid var(--line); border-radius:10px; padding:10px 11px; margin-bottom:8px; }
+  .card:hover { border-color:#334061; }
+  .row { display:flex; gap:8px; align-items:center; justify-content:space-between; }
+  .proj { color:var(--blue); font-weight:600; font-size:12.5px; cursor:pointer; }
+  .snip { font-size:12.3px; color:#c9cfdc; white-space:pre-wrap; max-height:120px; overflow:hidden; margin-top:6px;
+    font-family:ui-monospace, Menlo, Consolas, monospace; }
+  mark { background:rgba(255,209,102,.22); color:var(--gold); border-radius:3px; padding:0 2px; }
+  .cite { display:inline-flex; gap:6px; align-items:center; font:11.5px ui-monospace, Menlo, monospace; color:var(--gold);
+    background:rgba(255,209,102,.08); border:1px solid rgba(255,209,102,.25); border-radius:6px; padding:2px 7px;
+    cursor:pointer; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cite:hover { background:rgba(255,209,102,.16); }
+  .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid #2b3347; color:var(--dim);
+    margin:0 4px 4px 0; cursor:pointer; }
+  .pill.on { color:var(--ink); border-color:var(--gold); }
+  .kind { font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+  .k-decision { color:var(--green); } .k-rejected { color:var(--red); } .k-preference { color:var(--violet); }
+  .k-todo { color:var(--gold); } .k-fact { color:var(--blue); } .k-session { color:var(--teal); } .k-note { color:var(--dim); }
+  .closed { opacity:.55; } .closed .mtext { text-decoration:line-through; }
+  .stale { color:var(--red); font-size:11px; }
+  .meta { color:var(--dim); font-size:11.5px; }
+  .empty { color:var(--dim); line-height:1.6; padding:6px 2px; }
+  .empty code, .empty kbd { color:var(--ink); background:#0b0f19; border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
+  .tl { border-left:2px solid #263049; margin-left:6px; padding-left:14px; position:relative; }
+  .tl .dot { position:absolute; left:-7px; top:12px; width:12px; height:12px; border-radius:50%; border:2px solid var(--bg); }
+  .bar { height:4px; background:#1b2233; border-radius:4px; overflow:hidden; margin-top:6px; }
+  .bar i { display:block; height:100%; background:linear-gradient(90deg, var(--blue), var(--gold)); }
+  #legend { position:fixed; left:14px; bottom:14px; padding:10px 12px; max-width:min(560px, calc(100vw - 460px)); font-size:12px; }
+  #legend .sw { display:inline-flex; align-items:center; gap:5px; margin:0 10px 4px 0; color:var(--dim); cursor:pointer; }
+  #legend .sw i { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  #legend .sw.off { opacity:.35; }
+  #keys { color:var(--dim); font-size:11.5px; margin-top:6px; }
+  #keys kbd { color:var(--ink); border:1px solid #2b3347; border-radius:4px; padding:0 5px; font:11px ui-monospace, monospace; }
+  #tip { position:fixed; pointer-events:none; padding:8px 10px; font-size:12px; display:none; max-width:320px; z-index:20; }
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); padding:8px 14px; display:none; z-index:30; font-size:12.5px; }
+  #welcome { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:40; }
+  #welcome .glass { padding:28px 32px; max-width:520px; text-align:center; }
+  #welcome img { width:120px; }
+  @media (max-width: 1100px) { #searchbar { left:14px; transform:none; top:76px; width:calc(100vw - 452px); }
+    #legend { display:none; } }
 </style>
 </head>
 <body>
-<div id="bar">
-  <h1>Carto<span>graph</span></h1>
-  <input id="q" placeholder="Search your graph — e.g. 'how do I validate inputs' (Enter)"/>
-  <div id="stats">loading…</div>
-</div>
-<div id="wrap">
-  <div id="net"></div>
-  <div id="side">
-    <h2>Search results</h2>
-    <div id="results"><div class="empty">Type a query and press Enter. Relevant projects light up in the
-      graph; matching snippets appear here. Click a node to focus it.</div></div>
-  </div>
-</div>
-<script>
-const COLORS = {}; const PALETTE = ["#5ea0ff","#7ee787","#ffa657","#d2a8ff","#ff7b72","#79c0ff",
-  "#f0883e","#56d364","#e3b341","#db61a2","#a5d6ff","#ffab70"];
-let network, nodesDS, edgesDS, baseColor = {};
-function colorFor(field){ if(!COLORS[field]){ COLORS[field]=PALETTE[Object.keys(COLORS).length % PALETTE.length]; } return COLORS[field]; }
+<canvas id="map"></canvas>
 
-async function loadGraph(){
-  const r = await fetch('/api/graph'); const g = await r.json();
+<div id="brand" class="glass">
+  <img src="/mascot.png" alt="Cartograph mole"/>
+  <div><b>Carto<span>graph</span> Atlas</b><div id="stats">digging…</div></div>
+</div>
+
+<div id="searchbar" class="glass">
+  <input id="q" placeholder="Ask your graph — e.g. 'timolol permeability protocol'   ( / to focus )" autocomplete="off"/>
+  <select id="mode" title="What to retrieve">
+    <option value="mix">mix</option><option value="chunks">chunks</option><option value="graph">facts</option>
+    <option value="memory">memory</option><option value="projects">projects</option>
+  </select>
+</div>
+
+<div id="side" class="glass">
+  <div id="tabs">
+    <button data-tab="results" class="on">Results</button>
+    <button data-tab="project">Project</button>
+    <button data-tab="timeline">Memory timeline</button>
+  </div>
+  <div id="pane"></div>
+</div>
+
+<div id="legend" class="glass">
+  <div id="fields"></div>
+  <div id="keys"><kbd>L</kbd> headlamp · <kbd>E</kbd> entities · <kbd>T</kbd> labels · <kbd>F</kbd> fit ·
+    <kbd>/</kbd> search · drag to pan · scroll to zoom · click a node to open it</div>
+</div>
+
+<div id="tip" class="glass"></div>
+<div id="toast" class="glass"></div>
+<div id="welcome"><div class="glass">
+  <img src="/mascot.png" alt=""/>
+  <h2 style="margin:10px 0 4px">Nothing to map yet</h2>
+  <p class="empty">Point the mole at a folder and it will dig:<br/>
+    <code>carto ingest ~/research</code> then reload this page.<br/>PDFs, Office files, notebooks and code all work.</p>
+</div></div>
+
+<script>
+"use strict";
+// ------------------------------------------------------------------ helpers
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const PALETTE = ["#5ea0ff","#7ee787","#ffa657","#d2a8ff","#ff7b72","#79c0ff","#3fb8af","#e3b341","#db61a2","#a5d6ff","#f0883e","#56d364"];
+const ENTITY = {paper:"#ffd166", repo:"#a5d6ff", model:"#d2a8ff", dataset:"#3fb8af", package:"#8f99ad"};
+const fieldColor = {}; const hiddenFields = new Set();
+const colorFor = f => fieldColor[f] ??= PALETTE[Object.keys(fieldColor).length % PALETTE.length];
+const fmt = n => (n ?? 0).toLocaleString();
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.style.display="block"; clearTimeout(toast.h);
+  toast.h=setTimeout(()=>t.style.display="none", 1600); }
+function copy(text){ navigator.clipboard?.writeText(text).then(()=>toast("copied  "+text), ()=>toast(text)); }
+function highlight(text, q){
+  let h = esc(text); const words = (q||"").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w=>w.length>2);
+  for (const w of new Set(words)) h = h.replace(new RegExp("("+w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","gi"), "<mark>$1</mark>");
+  return h;
+}
+function shortCite(c){ const m = String(c).match(/^(.*?)((?::L[\d-]+| p\.\d+| slide \d+| sheet .+| § .+| cell [\d-]+)?)$/);
+  const parts = m[1].split(/[\\/]/).filter(Boolean); return (parts.length > 2 ? "…/" : "") + parts.slice(-2).join("/") + m[2]; }
+const citeChip = c => c ? `<span class="cite" data-copy="${esc(c)}" title="${esc(c)} — click to copy">⌖ ${esc(shortCite(c))}</span>` : "";
+document.addEventListener("click", e => { const c = e.target.closest("[data-copy]"); if (c) copy(c.dataset.copy);
+  const p = e.target.closest("[data-focus]"); if (p) focusNode(p.dataset.focus, true); });
+
+// ------------------------------------------------------------------ state
+const cv = $("#map"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = Math.max(1, window.devicePixelRatio || 1);
+let nodes = [], edges = [], byId = new Map(), adj = new Map();
+let cam = {x:0, y:0, k:1}, target = null;
+let lamp = true, showEntities = true, showLabels = true;
+let mouse = {x:-1e4, y:-1e4, inside:false}, hover = null, selected = null, hits = new Map(), pulses = [];
+let alpha = 1, dragNode = null, panning = null, moved = false;
+let stars = [];
+
+function resize(){ W = innerWidth; H = innerHeight; cv.width = W*DPR; cv.height = H*DPR;
+  stars = Array.from({length: Math.round(W*H/5200)}, () => ({x:Math.random()*W, y:Math.random()*H,
+    r:Math.random()*1.2+.2, a:Math.random()*.5+.1, tw:Math.random()*6.28})); }
+addEventListener("resize", resize); resize();
+
+const toWorld = (sx, sy) => ({x:(sx - W/2)/cam.k + cam.x, y:(sy - H/2)/cam.k + cam.y});
+const toScreen = (x, y) => ({x:(x - cam.x)*cam.k + W/2, y:(y - cam.y)*cam.k + H/2});
+const visible = n => !(n.kind === "entity" && !showEntities) && !(n.kind === "project" && hiddenFields.has(n.field || "general"));
+
+// ------------------------------------------------------------------ data
+async function load(){
+  const g = await (await fetch("/api/atlas")).json();
   const s = g.stats || {};
-  document.getElementById('stats').textContent =
-    `${s.projects||0} projects · ${s.files||0} files · ${s.chunks||0} chunks · ${s.edges||0} edges`;
-  const nodes = g.nodes.map(n => { baseColor[n.id]=colorFor(n.field||'general');
-    return { id:n.id, label:n.label, value:n.size||10, group:n.field||'general',
-      color:baseColor[n.id], font:{color:'#e7e9ee',size:13} }; });
-  const edges = g.edges.map(e => ({ from:e.source, to:e.target, color:{color:'#2b303c'} }));
-  nodesDS = new vis.DataSet(nodes); edgesDS = new vis.DataSet(edges);
-  network = new vis.Network(document.getElementById('net'), {nodes:nodesDS, edges:edgesDS}, {
-    nodes:{ shape:'dot', scaling:{min:6,max:42} },
-    physics:{ stabilization:true, barnesHut:{gravitationalConstant:-12000, springLength:140} },
-    interaction:{ hover:true, tooltipDelay:120 }
-  });
-  if(nodes.length===0){ document.getElementById('results').innerHTML =
-    '<div class="empty">Your graph is empty. Run <b>carto ingest &lt;folder&gt;</b> to populate it, then refresh.</div>'; }
+  $("#stats").textContent = `${fmt(s.projects)} projects · ${fmt(s.files)} files · ${fmt(s.chunks)} chunks` +
+    (s.entities ? ` · ${fmt(s.entities)} entities` : "") + (s.memories ? ` · ${fmt(s.memories)} memories` : "");
+  const projects = g.nodes.filter(n => n.kind === "project");
+  if (!projects.length){ $("#welcome").style.display = "flex"; return; }
+  const R = 60 * Math.sqrt(g.nodes.length);
+  nodes = g.nodes.map((n, i) => { const a = i * 2.399963, r = R * Math.sqrt((i + .5) / g.nodes.length);
+    return {...n, x:Math.cos(a)*r, y:Math.sin(a)*r, vx:0, vy:0,
+      r: n.kind === "entity" ? Math.min(9, 2.5 + n.size*.35) : Math.min(26, 4 + Math.sqrt(n.size)*2.6),
+      color: n.kind === "entity" ? (ENTITY[n.entity_kind] || "#8f99ad") : colorFor(n.field || "general")}; });
+  byId = new Map(nodes.map(n => [n.id, n]));
+  edges = g.edges.filter(e => byId.has(e.source) && byId.has(e.target))
+    .map(e => ({...e, s:byId.get(e.source), t:byId.get(e.target)}));
+  adj = new Map(nodes.map(n => [n.id, new Set()]));
+  for (const e of edges){ adj.get(e.source).add(e.target); adj.get(e.target).add(e.source); }
+  for (const n of nodes) n.deg = adj.get(n.id).size;
+  renderLegend(); alpha = 1;
+  for (let i = 0; i < 300; i++) tick();
+  fit(false);
 }
-function highlight(projects){
-  if(!nodesDS) return; const set = new Set(projects.map(p=>p.toLowerCase()));
-  nodesDS.forEach(n => {
-    const on = set.has((n.label||'').toLowerCase());
-    nodesDS.update({ id:n.id, color: on ? {background:'#ffd166', border:'#ffb703'} : baseColor[n.id],
-      borderWidth: on?3:1 });
-  });
+
+function renderLegend(){
+  const counts = {}; nodes.forEach(n => { if (n.kind === "project") { const f = n.field || "general"; counts[f] = (counts[f]||0) + 1; } });
+  const f = Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([k,v]) =>
+    `<span class="sw ${hiddenFields.has(k)?"off":""}" data-field="${esc(k)}"><i style="background:${colorFor(k)}"></i>${esc(k)} ${v}</span>`).join("");
+  const e = Object.entries(ENTITY).map(([k,c]) => `<span class="sw"><i style="background:${c};border-radius:2px;transform:rotate(45deg)"></i>${k}</span>`).join("");
+  $("#fields").innerHTML = f + (nodes.some(n=>n.kind==="entity") ? `<span style="opacity:.4;margin-right:10px">|</span>` + e : "");
+  $("#fields").querySelectorAll("[data-field]").forEach(el => el.onclick = () => {
+    const k = el.dataset.field; hiddenFields.has(k) ? hiddenFields.delete(k) : hiddenFields.add(k); renderLegend(); });
 }
+
+// ------------------------------------------------------------------ physics
+function tick(){
+  const vis = nodes.filter(visible), n = vis.length; if (!n) return;
+  const rep = 7000;
+  for (let i = 0; i < n; i++){ const a = vis[i];
+    for (let j = i + 1; j < n; j++){ const b = vis[j];
+      let dx = a.x - b.x, dy = a.y - b.y, d2 = dx*dx + dy*dy + 30;
+      if (d2 > 640000) continue;
+      const f = rep * alpha / d2, d = Math.sqrt(d2); dx /= d; dy /= d;
+      a.vx += dx*f*(b.r+4)/10; a.vy += dy*f*(b.r+4)/10; b.vx -= dx*f*(a.r+4)/10; b.vy -= dy*f*(a.r+4)/10; } }
+  for (const e of edges){ const a = e.s, b = e.t; if (!visible(a) || !visible(b)) continue;
+    const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx*dx + dy*dy) || 1;
+    const rest = e.relation === "MENTIONS" ? 60 : 160, k = .012 * alpha * (e.relation === "MENTIONS" ? 1.6 : 1) / Math.sqrt(Math.min(a.deg, b.deg) || 1);
+    const f = (d - rest) * k / d; a.vx += dx*f; a.vy += dy*f; b.vx -= dx*f; b.vy -= dy*f; }
+  for (const a of vis){ a.vx -= a.x * .0009 * alpha; a.vy -= a.y * .0009 * alpha;
+    if (a === dragNode) { a.vx = a.vy = 0; continue; }
+    a.vx *= .82; a.vy *= .82; a.x += a.vx; a.y += a.vy; }
+  alpha = Math.max(.02, alpha * .992);
+}
+
+function fit(animate = true, only = null){
+  const set = (only || nodes).filter(visible); if (!set.length) return;
+  let x0=1e9, y0=1e9, x1=-1e9, y1=-1e9;
+  for (const n of set){ x0 = Math.min(x0, n.x - n.r); y0 = Math.min(y0, n.y - n.r); x1 = Math.max(x1, n.x + n.r); y1 = Math.max(y1, n.y + n.r); }
+  const availW = W - 460, availH = H - 140;
+  const k = Math.min(2.2, Math.max(.08, Math.min(availW / (x1 - x0 + 120), availH / (y1 - y0 + 120))));
+  const t = {x:(x0 + x1)/2 + (430/2)/k, y:(y0 + y1)/2 - 20/k, k};
+  if (animate) target = t; else cam = t;
+}
+
+// ------------------------------------------------------------------ render
+function draw(time){
+  if (alpha > .021 || dragNode) tick();
+  if (target){ cam.x += (target.x - cam.x)*.12; cam.y += (target.y - cam.y)*.12; cam.k += (target.k - cam.k)*.12;
+    if (Math.abs(target.k - cam.k) < .001 && Math.hypot(target.x - cam.x, target.y - cam.y) < .5) target = null; }
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const g = ctx.createRadialGradient(W*.55, H*.45, 0, W*.55, H*.45, Math.max(W,H)*.8);
+  g.addColorStop(0, "#111a2e"); g.addColorStop(1, "#070a12"); ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  for (const s of stars){ ctx.globalAlpha = s.a * (.7 + .3*Math.sin(time/900 + s.tw)); ctx.fillStyle = "#9fb3d9";
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill(); }
+  ctx.globalAlpha = 1;
+
+  const focus = hover || selected, near = focus ? adj.get(focus.id) : null, anyHits = hits.size > 0;
+  ctx.save(); ctx.translate(W/2, H/2); ctx.scale(cam.k, cam.k); ctx.translate(-cam.x, -cam.y);
+  // edges
+  for (const e of edges){ if (!visible(e.s) || !visible(e.t)) continue;
+    const on = focus && (e.s === focus || e.t === focus), hit = hits.has(e.s.id) && hits.has(e.t.id);
+    ctx.strokeStyle = on ? "rgba(255,209,102,.85)" : hit ? "rgba(255,209,102,.45)" :
+      e.relation === "MENTIONS" ? "rgba(143,153,173,.10)" : `rgba(94,160,255,${Math.min(.35, .08 + (e.weight||1)*.02)})`;
+    ctx.lineWidth = (on ? 1.8 : 1) / Math.sqrt(cam.k);
+    ctx.beginPath(); ctx.moveTo(e.s.x, e.s.y); ctx.lineTo(e.t.x, e.t.y); ctx.stroke(); }
+  // nodes
+  for (const n of nodes){ if (!visible(n)) continue;
+    const dim = (focus && n !== focus && !near.has(n.id)) || (anyHits && !hits.has(n.id) && n !== focus);
+    ctx.globalAlpha = dim ? .22 : 1;
+    if (hits.has(n.id) || n === focus){ ctx.shadowColor = hits.has(n.id) ? "#ffd166" : n.color; ctx.shadowBlur = 24; }
+    ctx.fillStyle = hits.has(n.id) ? "#ffd166" : n.color;
+    ctx.beginPath();
+    if (n.kind === "entity"){ const r = n.r; ctx.moveTo(n.x, n.y - r); ctx.lineTo(n.x + r, n.y); ctx.lineTo(n.x, n.y + r); ctx.lineTo(n.x - r, n.y); ctx.closePath(); }
+    else ctx.arc(n.x, n.y, n.r, 0, 6.283);
+    ctx.fill(); ctx.shadowBlur = 0;
+    if (n === selected){ ctx.strokeStyle = "#fff"; ctx.lineWidth = 2/cam.k; ctx.stroke(); } }
+  ctx.globalAlpha = 1;
+  // pulses (search hits being "dug up")
+  pulses = pulses.filter(p => time - p.t0 < 1600);
+  for (const p of pulses){ const t = (time - p.t0)/1600, n = byId.get(p.id); if (!n || t < 0) continue;
+    ctx.strokeStyle = `rgba(255,209,102,${1 - t})`; ctx.lineWidth = 2/cam.k;
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r + t*60/Math.sqrt(cam.k), 0, 6.283); ctx.stroke(); }
+  ctx.restore();
+
+  // headlamp: darkness everywhere except a warm cone around the cursor
+  const lit = lamp && mouse.inside && !panning;
+  if (lamp){
+    ctx.fillStyle = "rgba(3,5,10,.62)";
+    if (lit){ const rg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 230);
+      rg.addColorStop(0, "rgba(3,5,10,0)"); rg.addColorStop(.6, "rgba(3,5,10,.18)"); rg.addColorStop(1, "rgba(3,5,10,.68)");
+      ctx.fillStyle = rg; ctx.fillRect(0,0,W,H);
+      const warm = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 200);
+      warm.addColorStop(0, "rgba(255,209,102,.16)"); warm.addColorStop(1, "rgba(255,209,102,0)");
+      ctx.fillStyle = warm; ctx.fillRect(mouse.x - 200, mouse.y - 200, 400, 400);
+    } else ctx.fillRect(0,0,W,H);
+  }
+  // labels (screen space so they stay crisp)
+  if (showLabels){
+    ctx.font = "600 12px ui-sans-serif, -apple-system, Segoe UI, sans-serif"; ctx.textAlign = "center";
+    const cand = [];
+    for (const n of nodes){ if (!visible(n)) continue;
+      const p = toScreen(n.x, n.y);
+      if (p.x < -50 || p.y < -20 || p.x > W + 50 || p.y > H + 20) continue;
+      const inLamp = lit && Math.hypot(p.x - mouse.x, p.y - mouse.y) < 210;
+      const pri = n === focus ? 5 : hits.has(n.id) ? 4 : (near && near.has(n.id)) ? 3 : inLamp ? 2 : n.kind === "project" ? 1 : 0;
+      if (pri) cand.push({n, p, pri, s:pri*1000 + n.r*cam.k}); }
+    cand.sort((a, b) => b.s - a.s);
+    const placed = []; let base = 0;
+    for (const {n, p, pri} of cand){
+      if (pri === 1 && ++base > Math.max(10, Math.round(W*H/60000))) continue;
+      const label = n.label.split("/").pop().slice(0, 30) + (n.label.split("/").pop().length > 30 ? "…" : "");
+      const w = ctx.measureText(label).width + 8, x = p.x - w/2, y = p.y + n.r*cam.k + 4;
+      if (placed.some(r => x < r.x + r.w && x + w > r.x && y < r.y + 16 && y + 16 > r.y)) continue;
+      placed.push({x, y, w});
+      ctx.fillStyle = "rgba(7,10,18,.72)"; ctx.fillRect(x, y, w, 16);
+      ctx.fillStyle = hits.has(n.id) || n === focus ? "#ffd166" : n.kind === "entity" ? "#c9cfdc" : "#e8ebf2";
+      ctx.fillText(label, p.x, y + 12); } }
+  requestAnimationFrame(draw);
+}
+
+// ------------------------------------------------------------------ interaction
+function pick(sx, sy){ const w = toWorld(sx, sy); let best = null, bd = 1e9;
+  for (const n of nodes){ if (!visible(n)) continue; const d = Math.hypot(n.x - w.x, n.y - w.y);
+    if (d < n.r + 6/cam.k && d < bd){ best = n; bd = d; } } return best; }
+cv.addEventListener("mousemove", e => {
+  mouse = {x:e.clientX, y:e.clientY, inside:true};
+  if (dragNode){ const w = toWorld(e.clientX, e.clientY); dragNode.x = w.x; dragNode.y = w.y; alpha = Math.max(alpha, .3); moved = true; return; }
+  if (panning){ cam.x -= (e.clientX - panning.x)/cam.k; cam.y -= (e.clientY - panning.y)/cam.k; panning = {x:e.clientX, y:e.clientY}; moved = true; target = null; return; }
+  hover = pick(e.clientX, e.clientY); const tip = $("#tip");
+  if (hover){ tip.style.display = "block"; tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY + 14) + "px";
+    tip.innerHTML = hover.kind === "entity"
+      ? `<b>${esc(hover.label)}</b><div class="meta">${esc(hover.entity_kind)} · shared by ${hover.deg} projects</div>`
+      : `<b>${esc(hover.label)}</b><div class="meta">${esc(hover.field || "general")} · ${hover.deg} links</div>`;
+  } else tip.style.display = "none";
+});
+cv.addEventListener("mouseleave", () => { mouse.inside = false; hover = null; $("#tip").style.display = "none"; });
+cv.addEventListener("mousedown", e => { moved = false; const n = pick(e.clientX, e.clientY);
+  if (n) dragNode = n; else { panning = {x:e.clientX, y:e.clientY}; cv.classList.add("dragging"); } });
+addEventListener("mouseup", e => { const n = dragNode; dragNode = null; panning = null; cv.classList.remove("dragging");
+  if (!moved){ const p = n || pick(e.clientX, e.clientY);
+    if (p) openNode(p); else if (e.target === cv){ selected = null; } } });
+cv.addEventListener("wheel", e => { e.preventDefault(); const before = toWorld(e.clientX, e.clientY);
+  cam.k = Math.min(6, Math.max(.05, cam.k * Math.exp(-e.deltaY * .0015))); target = null;
+  const after = toWorld(e.clientX, e.clientY); cam.x += before.x - after.x; cam.y += before.y - after.y; }, {passive:false});
+addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT"){ if (e.key === "Escape") e.target.blur(); return; }
+  const k = e.key.toLowerCase();
+  if (k === "/"){ e.preventDefault(); $("#q").focus(); }
+  else if (k === "l"){ lamp = !lamp; toast(lamp ? "headlamp on" : "headlamp off"); }
+  else if (k === "e"){ showEntities = !showEntities; alpha = .5; toast(showEntities ? "entities shown" : "entities hidden"); }
+  else if (k === "t"){ showLabels = !showLabels; }
+  else if (k === "f"){ fit(true, hits.size ? nodes.filter(n => hits.has(n.id)) : null); }
+  else if (k === "escape"){ selected = null; hits.clear(); }
+});
+
+function focusNode(id, open){ const n = byId.get(id) || nodes.find(x => x.kind === "project" && x.label === id);
+  if (!n) return; target = {x:n.x + (215)/Math.max(cam.k, .9), y:n.y, k:Math.max(cam.k, .9)};
+  pulses.push({id:n.id, t0:performance.now()}); if (open) openNode(n); }
+
+// ------------------------------------------------------------------ panels
+let tab = "results", lastResults = null, lastProject = null, timelineData = null, tlFilter = new Set();
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.tab));
+function show(t){ tab = t; document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  if (t === "results") renderResults(); else if (t === "project") renderProject(); else renderTimeline(); }
+
+function memCard(m, q){
+  const closed = m.valid_to ? " closed" : "";
+  return `<div class="card${closed}"><div class="row"><span class="kind k-${esc(m.kind)}">${esc(m.kind)}</span>
+    <span class="meta">${esc((m.created || "").slice(0, 10))}${m.project ? " · " + esc(m.project) : ""}</span></div>
+    <div class="mtext" style="margin-top:4px">${highlight(m.text, q)}</div>
+    ${m.stale ? `<div class="stale">⚠ ${esc(m.stale)}</div>` : ""}
+    ${m.valid_to ? `<div class="meta">replaced ${esc(m.valid_to.slice(0, 10))}${m.reason ? " — " + esc(m.reason) : ""}</div>` : ""}
+    ${(m.anchors || []).slice(0, 3).map(a => citeChip(a)).join(" ")}</div>`;
+}
+
+function renderResults(){
+  const p = $("#pane"), d = lastResults;
+  if (!d){ p.innerHTML = `<div class="empty"><h3>Search</h3>Press <kbd>/</kbd> and ask anything. Results come with a
+    <span class="cite">⌖ file.pdf p.12</span> citation you can click to copy, and matching projects light up on the map.<br/><br/>
+    <b>mix</b> returns memories, graph facts and passages under one token budget — exactly what an agent sees through MCP.</div>`; return; }
+  if (d.error){ p.innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
+  const q = d.query; let h = "";
+  if (d.tokens != null) h += `<div class="meta">${fmt(d.tokens)} / ${fmt(d.max_tokens)} tokens · ${esc(d.method || d.mode)}</div>
+    <div class="bar"><i style="width:${Math.min(100, 100*d.tokens/(d.max_tokens||1))}%"></i></div>`;
+  if (d.memories?.length) h += `<h3>Memories (${d.memories.length})</h3>` + d.memories.map(m => memCard(m, q)).join("");
+  if (d.facts?.length) h += `<h3>Graph facts (${d.facts.length})</h3>` + d.facts.map(f => `<div class="card">
+    <div class="row"><span class="proj" data-focus="${esc(f.project)}">${esc(f.project || "")}</span>
+    <span class="meta">${esc((f.relation || "").toLowerCase().replace(/_/g, " "))} · conf ${(+f.confidence || 0).toFixed(2)}</span></div>
+    <div style="margin:4px 0">${highlight(f.entity, q)}</div>${citeChip(f.evidence?.cite)}</div>`).join("");
+  if (d.projects?.length) h += `<h3>Projects (${d.projects.length})</h3>` + d.projects.map(x => `<div class="card"><div class="row">
+    <span class="proj" data-focus="${esc(x.project)}">${esc(x.project)}</span><span class="meta">${x.hits} passage${x.hits === 1 ? "" : "s"}</span></div>
+    <div style="margin-top:5px">${citeChip(x.best)}</div></div>`).join("");
+  if (d.chunks?.length) h += `<h3>Passages (${d.chunks.length})</h3>` + d.chunks.map(c => `<div class="card">
+    <div class="row"><span class="proj" data-focus="${esc(c.project)}">${esc(c.project || "")}</span></div>
+    <div style="margin-top:5px">${citeChip(c.cite)}</div>
+    <div class="snip">${highlight((c.text || "").slice(0, 700), q)}</div></div>`).join("");
+  p.innerHTML = h || `<div class="empty">Nothing found for “${esc(q)}”. Try fewer or different words, or the <b>chunks</b> mode.</div>`;
+}
+
 async function search(){
-  const q = document.getElementById('q').value.trim(); if(!q) return;
-  const res = document.getElementById('results'); res.innerHTML = '<div class="empty">searching…</div>';
-  const r = await fetch('/api/search?q='+encodeURIComponent(q)); const d = await r.json();
-  if(d.error){ res.innerHTML = '<div class="empty">'+d.error+'</div>'; return; }
-  highlight(d.projects||[]);
-  let html = '<div style="margin-bottom:8px">'+ (d.projects||[]).map(p=>'<span class="pill">'+p+'</span>').join('') +'</div>';
-  html += '<h2>Snippets ('+(d.method||'')+')</h2>';
-  (d.chunks||[]).forEach(c=>{ html += '<div class="hitcard"><div class="p">'+(c.project_name||'')+'</div>'+
-    '<div class="f">'+(c.file_path||'')+'</div><div class="t">'+
-    ((c.chunk_text||'').slice(0,280).replace(/</g,'&lt;'))+'</div></div>'; });
-  res.innerHTML = html || '<div class="empty">no matches</div>';
+  const q = $("#q").value.trim(); if (!q) return; show("results");
+  $("#pane").innerHTML = `<div class="empty">⛏ digging for “${esc(q)}”…</div>`;
+  const d = await (await fetch(`/api/context?q=${encodeURIComponent(q)}&mode=${$("#mode").value}`)).json();
+  lastResults = d; renderResults();
+  const names = new Set([...(d.chunks || []).map(c => c.project), ...(d.facts || []).map(f => f.project),
+    ...(d.projects || []).map(x => x.project), ...(d.memories || []).map(m => m.project)].filter(Boolean));
+  hits = new Map(); const now = performance.now(); let i = 0;
+  for (const n of nodes) if (n.kind === "project" && names.has(n.label)){ hits.set(n.id, true); pulses.push({id:n.id, t0:now + 120*i++}); }
+  if (hits.size){ fit(true, nodes.filter(n => hits.has(n.id))); if (target) target.k = Math.min(target.k, 1.6); }
 }
-document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') search(); });
-loadGraph();
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") search(); });
+
+async function openNode(n){
+  selected = n;
+  if (n.kind === "entity"){ $("#q").value = n.label; $("#mode").value = "graph"; search(); return; }
+  show("project"); $("#pane").innerHTML = `<div class="empty">opening ${esc(n.label)}…</div>`;
+  lastProject = await (await fetch(`/api/project?id=${encodeURIComponent(n.id)}`)).json(); renderProject();
+}
+
+function renderProject(){
+  const p = $("#pane"), d = lastProject;
+  if (!d){ p.innerHTML = `<div class="empty">Click a project on the map to see what it depends on, cites and references
+    (each with the line or page it came from), which projects it is linked to and why, and its memories.</div>`; return; }
+  if (d.error){ p.innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
+  let h = `<div class="row"><b style="font-size:16px">${esc(d.name)}</b><span class="meta">${esc(d.field)} · ${fmt(d.files)} files</span></div>
+    <div style="margin-top:6px">${citeChip(d.path)}</div>`;
+  if (d.related?.length) h += `<h3>Linked projects</h3>` + d.related.map(r => `<div class="card"><div class="row">
+    <span class="proj" data-focus="${esc(r.project)}">${esc(r.project)}</span><span class="meta">score ${(+r.score || 0).toFixed(1)}</span></div>
+    <div class="meta" style="margin-top:4px">via ${(r.via || []).slice(0, 5).map(esc).join(", ")}</div></div>`).join("");
+  const groups = {}; (d.entities || []).forEach(e => (groups[e.relation] ??= []).push(e));
+  for (const [rel, list] of Object.entries(groups)){
+    h += `<h3>${esc(rel.toLowerCase().replace(/_/g, " "))} (${list.length})</h3>` + list.map(e => `<div class="card">
+      <div class="row"><span>${esc(e.entity)}</span><span class="meta">${e.files} file${e.files === 1 ? "" : "s"} · ${esc(e.extractor)} ${(+e.confidence).toFixed(2)}</span></div>
+      <div style="margin-top:5px">${citeChip(e.evidence?.cite)}</div></div>`).join(""); }
+  if (d.memories?.length) h += `<h3>Memories</h3>` + d.memories.map(m => memCard(m, "")).join("");
+  p.innerHTML = h;
+}
+
+async function renderTimeline(){
+  const p = $("#pane");
+  if (!timelineData){ p.innerHTML = `<div class="empty">loading memories…</div>`;
+    timelineData = (await (await fetch("/api/timeline?limit=300")).json()).memories || []; }
+  if (!timelineData.length){ p.innerHTML = `<div class="empty"><h3>No memories yet</h3>Agents add them through MCP
+    (<code>remember</code>), you can with <code>carto memory add "…" --kind decision</code>, and
+    <code>carto hooks install</code> captures every session automatically.</div>`; return; }
+  const kinds = [...new Set(timelineData.map(m => m.kind))];
+  let h = `<div style="margin-bottom:6px">` + kinds.map(k => `<span class="pill ${tlFilter.has(k) ? "on" : ""}" data-k="${esc(k)}">
+    <span class="k-${esc(k)}">●</span> ${esc(k)}</span>`).join("") + `</div>`;
+  let day = "";
+  for (const m of timelineData){ if (tlFilter.size && !tlFilter.has(m.kind)) continue;
+    const d = (m.created || "").slice(0, 10); if (d !== day){ day = d; h += `<h3>${esc(d)}</h3>`; }
+    h += `<div class="tl"><span class="dot" style="background:var(--${({decision:"green",rejected:"red",preference:"violet",todo:"gold",fact:"blue",session:"teal"})[m.kind] || "dim"})"></span>${memCard(m, "")}</div>`; }
+  p.innerHTML = h;
+  p.querySelectorAll("[data-k]").forEach(el => el.onclick = () => { const k = el.dataset.k;
+    tlFilter.has(k) ? tlFilter.delete(k) : tlFilter.add(k); renderTimeline(); });
+}
+
+show("results"); load().then(() => requestAnimationFrame(draw)).catch(err => { $("#stats").textContent = "couldn't load: " + err; });
 </script>
 </body>
 </html>

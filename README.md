@@ -1,232 +1,237 @@
 <div align="center">
 
-# 🗺️ Cartograph
+<img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/banner.png" alt="Cartograph: your files, cited. Your agents, remembering." width="100%"/>
 
-**Build a personal cognitive graph of everything you work with — and plug it into your AI agents.**
+**A local knowledge graph and shared memory for every AI agent you use.**
+Point it at your folders: PDFs, Word, slides, spreadsheets, notebooks, notes and code become one graph
+your agents query over MCP, and every answer comes back with the page, slide or line it came from.
 
-*Point it at your folders. It maps your repos, notes, and docs into one searchable graph, learns your
-field, and serves the right context to Claude Code, Cursor, or any MCP agent — so every future
-task, from coding to daily generative-AI use, is grounded in **your** knowledge.*
+[![CI](https://github.com/pbathuri/cartograph/actions/workflows/ci.yml/badge.svg)](https://github.com/pbathuri/cartograph/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/cartograph__v1?color=ffd166&label=pypi)](https://pypi.org/project/cartograph__v1/)
+[![Python](https://img.shields.io/pypi/pyversions/cartograph__v1?color=5ea0ff)](https://pypi.org/project/cartograph__v1/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-3fb8af)](LICENSE)
+![Local-first](https://img.shields.io/badge/data-stays%20on%20your%20machine-7ee787)
 
-Local-first · your data never leaves your machine · works on any field · no ML expertise required
-
-[Quickstart](#-quickstart) · [How it works](#-how-it-works) · [Connect your agents](#-connect-your-agents)
-· [Requirements](#-requirements) · [Install tiers](#-install-tiers--graph-sizes) · [Visual app](#-the-visual-app)
+[Quickstart](#quickstart) · [What you get](#what-you-get) · [Works with](#works-with) ·
+[Benchmarks](#benchmarks) · [Compared](#how-it-compares) · [Use cases](#use-cases) · [Atlas](#the-atlas)
 
 </div>
 
 ---
 
-## ✨ Why
+## Why
 
-LLM agents are brilliant but amnesiac — they don't know your repos, your conventions, your past
-decisions, or what "good" looks like in your field. Cartograph fixes that locally:
+Agents forget. Every new session in Claude Code, Cursor or Codex starts from zero: it doesn't know
+your papers, your repos, what you decided last week or which approach you already ruled out. The
+usual fixes have a catch. They send your documents to an LLM to build the graph (slow and costly at
+scale, and your data leaves the machine), they need a database server, or they answer without saying
+where the answer came from.
 
-1. **Plug** — `pip install cartograph__v1`
-2. **Ingest** — `carto ingest ~/code` builds a graph of your work (incrementally, any folder)
-3. **(Optional) Train** — add semantic search / your own models on *your* graph
-4. **Auto-applied** — your agents query the graph over MCP for grounded context, forever
+Cartograph is the boring, dependable version:
 
-No cloud. No account. Your graph is a single SQLite file you own.
+- **No LLM needed to build the graph.** Parsing, chunking, entity extraction and linking are
+  deterministic. Bring any model you like to *use* it.
+- **One SQLite file** in `~/.cartograph`. No Docker, no Neo4j, no vector DB, no account.
+- **Every result is citable**: `paper.pdf p.12`, `deck.pptx slide 3`, `train.py:L40-88`,
+  `doses.xlsx sheet Doses`, `thesis.docx § Methods`.
+- **One memory shared by all your agents.** Decisions, rejected approaches and preferences stay
+  valid until they are superseded, and get flagged when the files they point at change.
 
----
+<table><tr>
+<td width="140"><img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/mascot.png" width="128" alt="Digby, the Cartograph mole"/></td>
+<td>Meet <b>Digby</b>, Cartograph's mole. He digs through your files so your agents don't have to,
+and his lamp only shines where there's evidence.</td>
+</tr></table>
 
-## 🚀 Quickstart
-
-```bash
-pip install cartograph__v1            # PyPI package name; the command is `carto`, the import is `cartograph`
-carto demo                        # ⚡ see it ALL work in ~10s on a synthetic corpus (zero setup)
-carto init                        # pick folder(s) + your field(s) — declaring your field makes labels accurate
-carto ingest                      # build your graph (re-run anytime; only changed files reprocess)
-carto viz                         # 👀 see your graph in the browser
-carto retrieve "how did I handle auth" --chunks   # hybrid search over everything you've done
-```
-
-Want semantic (meaning-based) search too?
-```bash
-pip install "cartograph__v1[semantic]"   # ~2GB; uses your GPU if present, else CPU
-carto index                          # embed your chunks once
-```
-
----
-
-## 🧠 How it works
-
-```mermaid
-flowchart TB
-    subgraph YOU["Your stuff (stays on your machine)"]
-        R["repos · notes · docs · books"]
-    end
-    subgraph CARTO["Cartograph"]
-        ING["Ingest: walk → chunk → infer field (incremental)"]
-        GRAPH["The graph — SQLite + FTS5\nprojects · files · chunks · skills · edges"]
-        SEM["Semantic index (optional)\nlocal embeddings, GPU-aware"]
-        HY["Hybrid retrieval (RRF of semantic + keyword)"]
-        EL["Elite layer\nfrontier catalog · playbooks · Definition-of-Done · coverage"]
-    end
-    subgraph OUT["Where it shows up"]
-        MCP["MCP server → Claude Code / Cursor / any agent"]
-        VIZ["Desktop visual graph"]
-        CLI["carto CLI"]
-    end
-    R --> ING --> GRAPH
-    GRAPH --> SEM --> HY
-    GRAPH --> HY --> EL
-    HY --> MCP & VIZ & CLI
-    EL --> MCP & CLI
-```
-
-**The graph schema** — everything you work with becomes connected nodes:
-
-```mermaid
-flowchart LR
-    Project -->|CONTAINS| File -->|CHUNKED_INTO| Chunk
-    Project -->|IN_FIELD| Field[("field: ml / quant / web / …")]
-    Project -->|RELATED_TO| Project
-    Project -.->|REPO_TEACHES| Skill
-    Chunk -->|FTS5 + embeddings| Search[("hybrid retrieval")]
-```
-
-**Hybrid retrieval is the headline.** It fuses meaning-based (semantic) and exact (keyword) search via
-Reciprocal Rank Fusion. In the engine Cartograph distills from, hybrid scored **success@10 0.986 vs
-0.958** for either method alone — it's *never worse*, because it catches both paraphrases (semantic)
-and exact tokens like a function name (keyword). It works in pure-keyword mode with zero ML installed,
-and turns on semantic automatically once you run `carto index`.
-
-**The elite layer** pulls any build toward the top of its field (works for ML, quant, web, HPC, data,
-devops, mobile, game-dev, research, libraries — and is one file to extend):
-- `carto elevate "<task>"` — the elite bar, reference repos, the frontier *playbook* (process), and the
-  repos you already have to build on
-- `carto frontier` — how much of your field's top-tier reference set you've ingested + what to add
-- `carto review <project> --field <f>` — grade a build against the field's Definition-of-Done
-
-### 🧭 The persona layer — steer your agents *to you*
-
-The graph knows your work; the **persona layer** learns *what you respond to* and shapes every answer.
-It models you as field weights + an optional preference vector in embedding space, re-ranks retrieval by
-alignment to you, and emits a model-agnostic **steering brief** any agent prepends — so Claude / Cursor /
-ChatGPT / Gemini outputs adapt to your field, conventions, and preferences, and **keep adapting** as you
-give feedback. Confidence-scaled: well-supported preferences steer hard, sparse ones barely nudge.
+## Quickstart
 
 ```bash
-carto persona                         # your learned focus + confidence
-carto personalize "how do I cache this?"   # the steering brief an agent prepends
-carto feedback --liked my-repo        # teach it what was useful (adapts over time)
-```
-The same brief is available to agents via the MCP `personalize` tool and to web GenAI via
-`carto serve` + a tiny userscript ([docs/BROWSER.md](docs/BROWSER.md)). Foundations, the
-Hilbert-space mapping, and honest limits: **[docs/PERSONA.md](docs/PERSONA.md)**.
-
----
-
-## 🔌 Connect your agents
-
-Cartograph speaks **MCP** (Model Context Protocol). Add it once and your agent can query your graph.
-
-**One-step wiring:** run `carto agent-setup` — it prints the MCP config *and* a system-prompt rule that
-makes your agent call Cartograph automatically each task (`personalize` → `retrieve_context` → `record_use`).
-
-**Claude Code / Cursor** — add to your MCP config (`~/.cursor/mcp.json` or Claude Code's MCP settings):
-```json
-{
-  "mcpServers": {
-    "cartograph": { "command": "carto", "args": ["mcp-server"], "type": "stdio" }
-  }
-}
+pip install "cartograph__v1[docs]"     # core + PDF support. Command: carto. Import: cartograph
+carto ingest ~/research ~/code         # incremental: re-run anytime, only changed files are re-read
+carto connect all                      # register the MCP server with every AI client it finds
+carto viz                              # the Atlas: explore the map, search with citations
 ```
 
-Your agent now has these tools:
-| Tool | What it gives the agent |
+Add meaning-based search when you want it (uses your GPU if there is one):
+
+```bash
+pip install "cartograph__v1[semantic]" && carto index     # resumable; searchable while it builds
+```
+
+Then ask your agent anything about your work. It calls `retrieve_context` and gets passages with
+citations, the relevant graph facts and your memories, under the token budget you set.
+
+## What you get
+
+| | |
 |---|---|
-| **`personalize`** | **call first** — a steering brief (your persona, field, output guidance + your relevant snippets) so the answer fits *you* and adapts over time |
-| `retrieve_context` | the relevant code/doc **snippets** to inject (hybrid) |
-| `relevant_projects` | which of your repos relate to the task |
-| `elevate_task` | top-of-field briefing: bar + reference repos + playbook |
-| `frontier_status` | your coverage of each field's best references |
-| `record_use` | after answering, report what helped → the persona adapts automatically |
-| `graph_stats` | size of your graph |
+| **Documents with citations** | PDF (pypdf or PyMuPDF, optional OCR), DOCX, PPTX, XLSX, EPUB, HTML, Jupyter, Markdown, LaTeX, BibTeX and 70 code, data and config formats. Chunks never cross page or slide boundaries. |
+| **A graph with provenance** | Dependencies from manifests, imports, papers (DOI and arXiv), GitHub repos and Hugging Face models and datasets. Each fact has evidence (a citable chunk), confidence, the extractor that found it, and first and last seen dates. Projects are linked by what they share, weighted by rarity, and each link lists the shared entities. |
+| **Temporal memory** | `remember`, `recall`, `supersede` and `brief`. Nothing is overwritten: validity intervals keep the history. You get conflict hints when a new memory contradicts an old one, and staleness flags when anchored files change. Files on an unplugged drive show as *unavailable*, not deleted. |
+| **Automatic session capture** | `carto hooks install` for Claude Code, Cursor, Gemini CLI and Codex. Session start injects the project brief. Session end saves the goal, files touched and commands run. Saying `decision: …` or `rejected: …` in chat becomes a memory. |
+| **Hybrid retrieval with hard budgets** | Reciprocal-rank fusion of BM25 and embeddings. Modes: `mix`, `chunks`, `projects`, `graph`, `memory`. `max_tokens` is a guarantee, not a hint. |
+| **Scales to millions of chunks** | A pure-NumPy IVF-PQ index: 7 ms p50 at 6.5M chunks instead of 8–10 s brute force, with no FAISS and no OpenMP conflicts. Index builds resume after a crash, and you can search while they run. |
+| **Honest MCP** | Real JSON Schemas, `readOnlyHint` and `destructiveHint` annotations, `isError` results. `--read-only` hides every tool that writes. |
+| **The Atlas** | An offline, interactive map of your graph: headlamp exploration, cited search, project panels with evidence, and a memory timeline. |
 
-> Tip: tell your agent in its system prompt *"At the start of a task, call `elevate_task` and
-> `retrieve_context` against Cartograph."* — then every future task is grounded in your knowledge.
+## Works with
 
----
+`carto connect` writes the right config for each client. It backs up the file first and never
+rewrites a file that contains comments:
 
-## 💻 Requirements
+| Client | | Client | |
+|---|---|---|---|
+| Claude Code | `carto connect claude-code` | Gemini CLI | `carto connect gemini` |
+| Claude Desktop | `carto connect claude-desktop` | OpenAI Codex | `carto connect codex` |
+| Cursor | `carto connect cursor` | Zed | `carto connect zed` |
+| Windsurf | `carto connect windsurf` | Continue | `carto connect continue` |
+| VS Code (Copilot agent mode) | `carto connect vscode` | LM Studio | `carto connect lm-studio` |
+| Cline | `carto connect cline` | Goose | `carto connect goose --print` |
 
-| | Minimum | Recommended |
+Any other MCP client: `carto connect cursor --print` shows the JSON to paste. ChatGPT and Gemini on
+the web: `carto serve` plus the userscript in [docs/BROWSER.md](docs/BROWSER.md).
+Runs on macOS, Linux and Windows with Python 3.10+; CI tests all three operating systems.
+
+<details><summary><b>MCP tools</b></summary>
+
+| Tool | Writes? | What the agent gets |
 |---|---|---|
-| Python | 3.10+ | 3.12 |
-| OS | Windows / macOS / Linux | any |
-| RAM | 4 GB | 16 GB+ |
-| Disk | ~50 MB + your data | put the graph on a fast/large drive (`CARTOGRAPH_HOME`) |
-| GPU | none (CPU works) | any CUDA GPU → ~10× faster embedding |
-| Heavy ML | **not required** | `cartograph__v1[semantic]` for meaning-based search |
+| `retrieve_context` | no | cited passages, or `mode: mix` for memories + facts + passages under `max_tokens` |
+| `brief` | no | session-start digest for the project at `cwd`: decisions, rejected approaches, todos, recent sessions |
+| `recall` | no | memories by query, project or kind; `history: true` includes superseded ones |
+| `entities` | no | what a project depends on, imports, cites; or which projects mention an entity — with evidence |
+| `relevant_projects` | no | your projects that relate to a task |
+| `personalize` | no | a steering brief from your field and feedback |
+| `elevate_task`, `frontier_status`, `frontier_hints` | no | top-of-field reference repos and playbooks |
+| `graph_stats` | no | sizes of the graph, entities and memory |
+| `remember`, `supersede` | yes | save a decision, preference, fact or todo, or replace one |
+| `record_use` | yes | report what helped, so ranking adapts |
 
-**Efficiency tips**
-- Put your workspace on a fast, roomy drive: `export CARTOGRAPH_HOME=/mnt/fast/cartograph`.
-- A CUDA GPU makes `carto index` dramatically faster; CPU still works (just slower).
-- `carto ingest` is incremental — re-run it anytime; only changed files reprocess.
-- Brute-force semantic search is fine to a few million chunks (~150 ms/query). Past that, see
-  [docs/SCALING.md](docs/SCALING.md) to swap in FAISS.
+</details>
 
----
+## Benchmarks
 
-## 📦 Install tiers & graph sizes
+Everything below is reproducible with `carto bench`. It runs in a throwaway home and never
+touches your graph.
 
-Cartograph is **modular** — install only what you need, and grow the graph to any size:
+| Suite | Mode | Quality | Latency p50 / p95 |
+|---|---|---|---|
+| BEIR SciFact (300 queries, 5,183 abstracts) | keyword | nDCG@10 **0.655** · R@100 0.873 · MRR@10 0.622 | 23 / 41 ms |
+| BEIR SciFact | hybrid (nomic-embed v1.5) | nDCG@10 **0.709** · R@100 0.938 · MRR@10 0.673 | 70 / 135 ms |
+| Citations (240 planted facts in PDF, DOCX, PPTX, MD and PY) | keyword | exact citation@1 **0.992** · hit@5 1.000 | 3 / 7 ms |
 
-| Install | Command | Adds |
-|---|---|---|
-| **Core** | `pip install cartograph__v1` | full graph + keyword search + viz + Studio + MCP. Tiny, instant. |
-| **Semantic** | `pip install "cartograph__v1[semantic]"` | meaning-based + hybrid search; the learned models (~2 GB) |
-| **ML** | `pip install "cartograph__v1[ml]"` | train your own graph models on your data |
-| **Vision** | `pip install "cartograph__v1[vision]"` | real-time screen capture → OCR → graph (`carto watch`; needs Tesseract) |
-| **Secure** | `pip install "cartograph__v1[secure]"` | at-rest encryption for sensitive data (e.g. screen captures) |
-| **Everything** | `pip install "cartograph__v1[full]"` | all of the above |
+For reference, BEIR reports BM25 at 0.665 nDCG@10 on SciFact. The citation suite checks that the top
+result is the right file *and* that its citation points at the right page, slide or line. That's what
+you need before you trust an answer, and most RAG benchmarks don't measure it.
 
-**Graph-size tiers** — *don't* download one giant graph. Choose what fits:
-- **Your own** (recommended): `carto ingest` your folders — the graph is exactly your scale.
-- **Starter reference packs** (optional, public OSS only — never anyone's personal data): pre-built
-  graphs of curated top-tier repos per field, offered as quantized download tiers (S / M / L) via
-  GitHub Releases. Pick a small pack to seed a new field, or build your own with
-  `scripts/build_reference_pack.py`. See [docs/REFERENCE_PACKS.md](docs/REFERENCE_PACKS.md).
+At scale, on a real 6.5M-chunk, 535k-file graph on an M-series Mac: approximate semantic search takes
+**7 ms p50 / 11 ms p95** (brute force: 8–10 s) with tie-aware recall@10 of 0.99. Extracting entities
+from all 6.5M chunks takes about 15 minutes.
 
----
+## How it compares
 
-## 🖥️ The visual app
+All of these projects are good, and several inspired parts of Cartograph. They make different
+trade-offs. This summary is based on each project's own docs at the time of writing; corrections welcome.
 
-For non-technical users, one command opens an interactive map of your knowledge:
+| | Graph built without an LLM | Runs with no servers | Main focus |
+|---|---|---|---|
+| **Cartograph** | yes | yes (one SQLite file) | your files plus agent memory, with citations |
+| Mem0 / OpenMemory | no (LLM extracts memories) | optional | chat and agent memory |
+| Graphiti (Zep) | no | no (Neo4j or FalkorDB) | temporal knowledge graph of conversations |
+| Cognee | no | yes (embedded defaults) | LLM-built knowledge graphs from data |
+| LightRAG | no | yes | graph plus vector RAG |
+| Microsoft GraphRAG | no (LLM-heavy indexing) | yes | community summaries over a corpus |
+| RAGFlow | partly (parsing is not LLM-based) | no (Docker stack) | deep document understanding |
+| Khoj | yes for search; chat needs an LLM | self-hosted server | personal AI assistant |
+| Claude Context | yes | no (Milvus or Zilliz + embedding API) | semantic code search over MCP |
+
+Pick Cartograph when you want your agents grounded in *your* documents and decisions, locally, with
+citations, at zero indexing cost. Pick an LLM-extraction system when you need open-ended relation
+extraction from prose and can pay for it.
+
+## Use cases
+
+- **Research.** Search a library of papers and lab notes; answers cite `paper.pdf p.7`. Projects
+  sharing an arXiv paper or dataset are linked automatically. Agents remember which protocol you settled on.
+- **Software.** Your repos, their dependencies and imports, and your past decisions: "we rejected
+  Redis for this, see the session from March". `brief` greets every new agent session with the
+  project's state.
+- **Data science.** Notebooks are indexed by cell (`analysis.ipynb cell 4-6`), and spreadsheets by sheet.
+  Hugging Face models and datasets become graph entities.
+- **Law, policy and consulting.** Long Word and PDF documents with section and page citations you can
+  paste into a memo.
+- **Students and teaching.** Lecture slides (`slide 12`), readings and assignments in one searchable
+  map; works offline.
+- **Finance and operations.** Workbooks are searchable by sheet and the reports by page, all on your own machine.
+
+It works the same across fields because nothing is tuned to one domain. Field labels are learned from
+your folders (`carto fields`), and the graph is built from file structure, not from a prompt.
+
+## The Atlas
 
 ```bash
-carto viz        # or double-click scripts/launch_viz.bat (Windows) / launch_viz.sh (mac/linux)
+carto viz
 ```
 
-- Pan/zoom a force-directed graph of your projects, colored by field.
-- Type a query → relevant projects **light up** and matching snippets appear.
-- Zero setup, runs locally in your browser, no data leaves your machine.
+An interactive map of your graph that works offline: no CDN, no tracking.
 
----
+<img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/atlas.jpg" alt="Atlas: a search lights up matching projects; results show memories and cited passages" width="100%"/>
 
-## 🔒 Privacy
+<table><tr>
+<td width="50%"><img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/atlas-project.jpg" alt="Project panel: linked projects and why, dependencies with evidence"/></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/atlas-timeline.jpg" alt="Memory timeline with superseded decisions"/></td>
+</tr></table>
 
-- **Local-first.** Everything lives in `~/.cartograph` (or `CARTOGRAPH_HOME`). Nothing is uploaded.
-- **Your data is git-ignored** by default; the graph, index, and config never get committed.
-- Reference packs contain **only public OSS** — never personal data.
+<sub>Screenshots use a synthetic lab (<code>python scripts/atlas_showcase.py</code>), not anyone's real files.</sub>
 
----
+- **Headlamp** (`L`): the map stays dark and lights up where you point. Labels appear under the lamp.
+- **Search** (`/`): matching projects glow and pulse. Results show memories, graph facts and passages,
+  each with a citation chip; click it to copy `path:L12-48`.
+- **Project panel**: click a node to see its dependencies, citations and references with evidence,
+  linked projects and the entities that link them, and its memories.
+- **Memory timeline**: every decision, rejection and session in order. Superseded entries are struck through.
+- Entity hubs (papers, repos, models, datasets shared by several projects) show as diamonds (`E` toggles them).
 
-## 🧩 Extending
+## Robustness
 
-Add your field in three small files and Cartograph elevates it like any other:
-`cartograph/elite/catalog.py` (reference repos) · `playbooks.py` (the process) · `dod.py` (the bar).
-Field inference lives in `cartograph/ingest.py`.
+- **Incremental and exact.** Files are hashed in full. Unchanged files are skipped by size and mtime
+  without being read, and older graphs migrate in place.
+- **Crash-safe indexing.** A killed `carto index` resumes from the rows already written.
+  `carto index --background` detaches it, and `carto index --status --watch` shows progress.
+- **External drives.** Files on an unmounted drive are reported as unavailable rather than deleted,
+  so memory anchors and citations survive a missing USB disk.
+- **Bad files.** An unreadable PDF or a corrupt DOCX is skipped without stopping the ingest.
+- **Safe config edits.** `connect` and `hooks` back up every file they touch, are idempotent, and
+  can be undone (`--remove`, `hooks uninstall`).
 
-## 🗂️ Commands
+## Install options
 
-`carto demo · agent-setup · init · ingest · index · train · route · watch · retrieve · elevate ·
-frontier · review · persona · personalize · feedback · prefs · serve · studio · secure · stats · viz ·
-mcp-server · doctor` (run `carto --help`).
+| Install | Adds |
+|---|---|
+| `pip install cartograph__v1` | graph, keyword search, Office, EPUB and HTML, memory, MCP, Atlas. A small install with no ML. |
+| `[docs]` | PDF text with page citations (`pypdf`; PyMuPDF is used if present, plus OCR with `ocr: true`) |
+| `[semantic]` | embeddings and hybrid search (sentence-transformers; CUDA or Apple GPU if available) |
+| `[ml]`, `[vision]`, `[secure]` | train models on your graph, screen capture to OCR, at-rest encryption |
+| `[full]` | everything |
+
+Put the graph on a roomy drive with `CARTOGRAPH_HOME=/path`. See [docs/SCALING.md](docs/SCALING.md)
+and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Commands
+
+```
+ingest · index · retrieve · entities · memory add|recall|supersede|forget|brief · hooks install|status
+connect · viz · studio · serve · bench · stats · doctor · mcp-server · demo · init · improve · eval
+```
+
+Run `carto <command> --help` for details. Changes are in [CHANGELOG.md](CHANGELOG.md).
+
+## Privacy
+
+Everything lives in `~/.cartograph` (or `CARTOGRAPH_HOME`). Nothing is uploaded, and there is no telemetry.
+The local web server binds to loopback, checks the Host header against DNS rebinding, and requires a
+token for anything that writes.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Use it, fork it, build your own.
+MIT. See [LICENSE](LICENSE).

@@ -692,7 +692,7 @@ def bench(suite: list[str] = typer.Option(["citations", "scifact"], "--suite",
     if as_json:
         console.print_json(json.dumps(rep))
     else:
-        console.print(markdown(rep), markup=False)
+        console.print(markdown(rep), markup=False, soft_wrap=True)
         console.print(f"results: {rep['path']}", style="dim")
 
 
@@ -757,10 +757,11 @@ def agent_setup(rules_file: bool = typer.Option(False, "--write-rules",
                 help="Also write the agent rule to .cartograph_agent_rules.md in the cwd.")) -> None:
     """Print the exact MCP config + the system-prompt rule that makes any agent use Cartograph on every
     prompt. Paste the JSON into your MCP client and the rule into your agent's system prompt / rules."""
-    cfg_json = json.dumps({"mcpServers": {"cartograph": {
-        "command": "carto", "args": ["mcp-server"], "type": "stdio"}}}, indent=2)
-    console.print("[bold]1) MCP config[/bold] — add to ~/.cursor/mcp.json (Cursor) or your Claude Code MCP settings:")
-    console.print(cfg_json)
+    from .connect import server
+    cfg_json = json.dumps({"mcpServers": {"cartograph": server()}}, indent=2)
+    console.print("[bold]1) MCP config[/bold] — easiest: [bold]carto connect all[/bold] (writes it for every client "
+                  "found). Or paste this into your client's MCP settings:")
+    console.print(cfg_json, markup=False, soft_wrap=True)
     console.print("\n[bold]2) System-prompt / rules[/bold] — paste into your agent's rules so it auto-uses Cartograph:")
     console.print(f"[dim]{_AGENT_RULE}[/dim]")
     console.print("\n[bold]3) Web GenAI[/bold] (ChatGPT/Gemini): run [bold]carto serve[/bold] + the userscript in docs/BROWSER.md.")
@@ -929,6 +930,48 @@ def hooks_status() -> None:
     for s in H.status():
         state = "[green]installed[/green]" if s["installed"] else ("not installed" if s["exists"] else "[dim]client not found[/dim]")
         console.print(f"  {s['client']:<12} {state}  [dim]{s['config']}[/dim]")
+
+
+@app.command()
+def connect(
+    client: list[str] = typer.Argument(None, help="claude-code, claude-desktop, cursor, windsurf, vscode, cline, "
+                                                  "gemini, codex, zed, continue, lm-studio, goose — or 'all' (found ones)"),
+    read_only: bool = typer.Option(False, "--read-only", help="Serve only tools that never write (no memory writes)."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would change; write nothing."),
+    show: bool = typer.Option(False, "--print", help="Print the config snippet to paste by hand instead."),
+    remove: bool = typer.Option(False, "--remove", help="Remove Cartograph from these clients."),
+) -> None:
+    """Plug Cartograph's MCP server into your AI clients (edits their config; backs it up first).
+    With no client: show which clients are installed and connected."""
+    from . import connect as C
+    if not client:
+        from rich.table import Table
+        t = Table(box=None, pad_edge=False, show_header=True, header_style="dim")
+        for col in ("client", "status", "config"):
+            t.add_column(col, overflow="fold")
+        for s in C.status():
+            state = ("[green]● connected[/green]" if s["connected"] else f"[yellow]○[/yellow] carto connect {s['client']}") \
+                if s["detected"] else "[dim]· not installed[/dim]"
+            home = str(Path.home())
+            t.add_row(s["label"], state, f"[dim]{s['path'].replace(home, '~', 1)}[/dim]")
+        console.print(t)
+        return
+    targets = [s["client"] for s in C.status() if s["detected"]] if client == ["all"] else list(client)
+    for c in targets:
+        if c not in C.CLIENTS:
+            console.print(f"[red]unknown client {c}[/red] (choose from {', '.join(C.CLIENTS)})")
+            continue
+        if show:
+            console.print(f"[bold]{C.CLIENTS[c][0]}[/bold]  [dim]{C.config_path(c)}[/dim]")
+            console.print(C.snippet(c, read_only), markup=False, soft_wrap=True)
+            continue
+        r = C.disconnect(c) if remove else C.connect(c, read_only=read_only, dry_run=dry_run)
+        mark = "[green]✓[/green]" if r["changed"] else "[dim]·[/dim]"
+        console.print(f"{mark} {r['label']:<30} {r['path']}  {r.get('note') or ('removed' if remove else 'connected')}")
+        if r.get("snippet"):
+            console.print(r["snippet"], markup=False, soft_wrap=True)
+    if targets and not (dry_run or show):
+        console.print("[dim]restart the client to load the server. Session capture is separate: carto hooks install[/dim]")
 
 
 if __name__ == "__main__":

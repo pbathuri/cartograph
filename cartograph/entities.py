@@ -51,6 +51,8 @@ _PY_STDLIB = set(getattr(sys, "stdlib_module_names", ())) | {"__future__", "typi
 _NODE_BUILTINS = {"fs", "path", "os", "url", "util", "http", "https", "crypto", "stream", "events", "child_process",
                   "assert", "buffer", "zlib", "net", "tls", "readline", "process", "querystring", "worker_threads",
                   "react-dom/client"}
+_TOOLCHAIN = {"pypi/python", "pypi/pip", "pypi/setuptools", "pypi/wheel", "pypi/conda", "pypi/nodejs",
+              "pypi/r-base", "pypi/ipykernel", "pypi/ipython", "pypi/jupyter", "pypi/notebook"}
 _GH_SKIP = {"orgs", "features", "settings", "marketplace", "topics", "sponsors", "about", "pricing", "login",
             "apps", "collections", "explore", "notifications", "pulls", "issues", "search", "site", "user-attachments"}
 
@@ -105,6 +107,11 @@ def _py_manifest(text: str, toml: bool) -> Iterable[str]:
 
 
 def _manifest_deps(kind: str, text: str) -> Iterable[str]:
+    """Declared dependencies, minus interpreters and tooling that every environment lists."""
+    return (d for d in _declared(kind, text) if d not in _TOOLCHAIN)
+
+
+def _declared(kind: str, text: str) -> Iterable[str]:
     if kind == "requirements":
         for line in text.splitlines():
             line = line.split("#", 1)[0].strip()
@@ -332,9 +339,11 @@ def link_projects(store: Store, per_project: int = 5, max_df: int = 40, min_scor
         rows = c.execute("SELECT DISTINCT m.entity_id, f.project_id FROM mentions m "
                          "JOIN files f ON f.id = m.file_id WHERE f.project_id IS NOT NULL").fetchall()
         names = {r[0]: f"{r[1]}:{r[2]}" for r in c.execute("SELECT id, kind, name FROM entities")}
+    noise = {f"package:{t}" for t in _TOOLCHAIN}
     projs: dict = defaultdict(set)
     for eid, pid in rows:
-        projs[eid].add(pid)
+        if names.get(eid) not in noise:
+            projs[eid].add(pid)
     score: dict = defaultdict(float)
     shared: dict = defaultdict(int)
     via: dict = defaultdict(list)

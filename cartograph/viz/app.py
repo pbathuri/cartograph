@@ -24,6 +24,89 @@ from ..storage import Store
 
 _HTML = Path(__file__).with_name("index.html")
 _STUDIO = Path(__file__).with_name("studio.html")
+_STATIC = {"/mascot.png": "mascot.png", "/favicon.png": "favicon.png"}
+
+
+def _q(u, key: str, default: str = "") -> str:
+    return (parse_qs(u.query).get(key) or [default])[0]
+
+
+def entity_hubs(store: Store, project_ids: set[int], limit: int = 60) -> dict:
+    """Entities shared by several projects (papers, repos, models, packages), as extra Atlas nodes."""
+    if not store.has_table("mentions") or not project_ids:
+        return {"nodes": [], "edges": []}
+    with store.cursor() as c:
+        rows = c.execute(
+            "SELECT e.id, e.kind, e.name, f.project_id pid, sum(m.count) n FROM mentions m "
+            "JOIN entities e ON e.id = m.entity_id JOIN files f ON f.id = m.file_id "
+            "GROUP BY e.id, f.project_id").fetchall()
+    from ..entities import _TOOLCHAIN
+    by_ent: dict[int, dict] = {}
+    for r in rows:
+        if r["pid"] not in project_ids or (r["kind"] == "package" and r["name"] in _TOOLCHAIN):
+            continue
+        d = by_ent.setdefault(r["id"], {"kind": r["kind"], "name": r["name"], "projects": {}})
+        d["projects"][r["pid"]] = r["n"]
+    shared = [(k, v) for k, v in by_ent.items() if 2 <= len(v["projects"]) <= max(3, len(project_ids) // 3)]
+    rarity = {"paper": 3.0, "dataset": 2.5, "model": 2.5, "repo": 1.5, "package": 1.0}
+    shared.sort(key=lambda kv: -(rarity.get(kv[1]["kind"], 1.0) * len(kv[1]["projects"])))
+    nodes, edges = [], []
+    for eid, d in shared[:limit]:
+        nid = f"e{eid}"
+        nodes.append({"id": nid, "label": d["name"], "kind": "entity", "entity_kind": d["kind"],
+                      "size": 4 + 2 * len(d["projects"])})
+        edges += [{"source": f"p{pid}", "target": nid, "relation": "MENTIONS", "weight": n}
+                  for pid, n in d["projects"].items()]
+    return {"nodes": nodes, "edges": edges}
+
+
+def project_detail(store: Store, node_id: str) -> dict:
+    from .. import entities as E
+    from .. import memory as M
+    pid = int(node_id.lstrip("p"))
+    with store.cursor() as c:
+        row = c.execute("SELECT id, name, path, field FROM projects WHERE id = ?", (pid,)).fetchone()
+        if not row:
+            return {"error": "no such project"}
+        nf = c.execute("SELECT count(*) FROM files WHERE project_id = ?", (pid,)).fetchone()[0]
+    out = {"id": node_id, "name": row["name"], "path": row["path"], "field": row["field"] or "", "files": nf,
+           "related": E.related_projects(store, pid)[:12], "entities": E.project_entities(store, pid, limit=40)}
+    out["memories"] = M.recall(store, cwd=row["path"], history=True, limit=30)["memories"] \
+        if store.has_table("memories") and row["path"] else []
+    return out
+
+
+_ATLAS: dict = {}
+_ATLAS_LOCK = threading.Lock()
+
+
+def _db_version() -> tuple:
+    p = db_path()
+    return tuple(f.stat().st_mtime_ns if f.exists() else 0 for f in (p, p.with_name(p.name + "-wal")))
+
+
+def atlas_json() -> str:
+    """The Atlas payload, rebuilt only when the graph file changes (counting 6M+ chunks takes seconds)."""
+    with _ATLAS_LOCK:
+        ver = _db_version()
+        if _ATLAS.get("version") != ver:
+            from .. import entities as E
+            from .. import memory as M
+            store = Store(db_path(), read_only=True)
+            data = store.graph_sample(max_nodes=600)
+            hubs = entity_hubs(store, {int(n["id"][1:]) for n in data["nodes"]})
+            data["nodes"] += hubs["nodes"]
+            data["edges"] += hubs["edges"]
+            data["stats"] = {**store.stats(), **E.counts(store), **M.stats(store)}
+            _ATLAS.update(version=ver, body=json.dumps(data))
+        return _ATLAS["body"]
+
+
+def timeline(store: Store, limit: int = 200) -> dict:
+    from .. import memory as M
+    if not store.has_table("memories"):
+        return {"memories": []}
+    return {"memories": M.recall(store, history=True, limit=limit)["memories"]}
 
 
 def _chat_command(text: str) -> dict:
@@ -93,8 +176,28 @@ def _make_handler():
                 return
             u = urlparse(self.path)
             ro = lambda: Store(db_path(), read_only=True)  # noqa: E731
-            if u.path in ("/", "/index.html"):
+            if u.path in ("/", "/index.html", "/atlas"):
                 return self._send(200, _HTML.read_bytes(), "text/html; charset=utf-8")
+            if u.path in _STATIC:
+                f = Path(__file__).with_name(_STATIC[u.path])
+                return self._send(200, f.read_bytes(), "image/png") if f.exists() else self._send(404, b"")
+            if u.path == "/api/atlas":
+                return self._send(200, atlas_json())
+            if u.path == "/api/context":
+                try:
+                    from ..retrieve import context
+                    out = context(_q(u, "q"), ro(), load_config(), mode=_q(u, "mode", "mix"),
+                                  max_tokens=int(_q(u, "max_tokens", "2500")), top_k=10)
+                    return self._send(200, json.dumps(out, default=str))
+                except Exception as e:  # noqa: BLE001
+                    return self._send(200, json.dumps({"error": str(e)}))
+            if u.path == "/api/project":
+                try:
+                    return self._send(200, json.dumps(project_detail(ro(), _q(u, "id")), default=str))
+                except (ValueError, TypeError) as e:
+                    return self._send(400, json.dumps({"error": str(e)}))
+            if u.path == "/api/timeline":
+                return self._send(200, json.dumps(timeline(ro(), int(_q(u, "limit", "200"))), default=str))
             if u.path == "/studio":
                 html = _STUDIO.read_text(encoding="utf-8").replace("__CARTO_TOKEN__", api_token())
                 return self._send(200, html, "text/html; charset=utf-8")
@@ -184,9 +287,23 @@ def launch(host: str = "127.0.0.1", port: int = 8787, open_browser: bool = True,
     if not db_path().exists():
         print("No graph yet. Run `carto init` then `carto ingest <folder>` first.")
         return
-    httpd = socketserver.ThreadingTCPServer((host, port), _make_handler())
-    httpd.daemon_threads = True
-    url = f"http://{host}:{port}{path}"
+    class Server(socketserver.ThreadingTCPServer):
+        allow_reuse_address = True
+        daemon_threads = True
+
+    for p in range(port, port + 20):
+        try:
+            httpd = Server((host, p), _make_handler())
+            break
+        except OSError:
+            continue
+    else:
+        print(f"Ports {port}-{port + 19} are all in use; pass --port.")
+        return
+    if p != port:
+        print(f"port {port} is busy, using {p}")
+    url = f"http://{host}:{p}{path}"
+    threading.Thread(target=atlas_json, daemon=True).start()
     print(f"Cartograph running at {url}  (Ctrl+C to stop)")
     if open_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()

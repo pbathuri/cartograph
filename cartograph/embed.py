@@ -24,11 +24,11 @@ _FILES = ("vectors.npy", "chunk_ids.npy", "project_ids.npy")
 
 
 def available() -> bool:
+    """Whether the semantic extra is installed, without importing it (importing torch takes seconds)."""
+    import importlib.util
     try:
-        import numpy  # noqa
-        import sentence_transformers  # noqa
-        return True
-    except Exception:
+        return all(importlib.util.find_spec(m) is not None for m in ("numpy", "sentence_transformers"))
+    except (ImportError, ValueError):
         return False
 
 
