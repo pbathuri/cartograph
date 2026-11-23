@@ -44,6 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_edges_src ON edges(src_id, relation);
 # "not recorded yet" and every reader treats it that way.
 MIGRATIONS = {
     "files": (("size", "INTEGER"), ("mtime", "REAL")),
+    "chunks": (("locator", "TEXT"),),
 }
 
 
@@ -179,11 +180,24 @@ class Store:
             row = c.execute("SELECT id FROM projects WHERE name=?", (name,)).fetchone()
             return row["id"] if row else None
 
-    def add_chunks(self, file_id: int, texts: list[str]) -> int:
+    def add_chunks(self, file_id: int, texts: list[str], locators: list[str] | None = None) -> int:
+        """Append chunks; `locators` (same length) say where each came from: `L12-40`, `p.3`, `slide 2`."""
+        locs = locators if locators is not None else [None] * len(texts)
         with self.cursor() as c:
-            c.executemany("INSERT INTO chunks(file_id, chunk_text, ordinal) VALUES(?,?,?)",
-                          [(file_id, t, i) for i, t in enumerate(texts)])
+            c.executemany("INSERT INTO chunks(file_id, chunk_text, ordinal, locator) VALUES(?,?,?,?)",
+                          [(file_id, t, i, loc or None) for i, (t, loc) in enumerate(zip(texts, locs))])
         return len(texts)
+
+    def has_column(self, table: str, column: str) -> bool:
+        """Whether an (older, possibly read-only) graph already has a migrated column."""
+        cache = self.__dict__.setdefault("_cols", {})
+        if table not in cache:
+            with self.cursor() as c:
+                cache[table] = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+        return column in cache[table]
+
+    def locator_sql(self, alias: str = "ch") -> str:
+        return f"{alias}.locator" if self.has_column("chunks", "locator") else "NULL"
 
     def add_edge(self, src_id: int, relation: str, dst_id: int, metadata: str = "") -> None:
         with self.cursor() as c:
@@ -198,8 +212,8 @@ class Store:
     # ---- reads ----
     def search_chunks(self, fts_query: str, limit: int = 20, project_id: int | None = None) -> list[dict]:
         base = (
-            "SELECT ch.id AS chunk_id, ch.chunk_text, f.path AS file_path, p.name AS project_name, "
-            "p.id AS project_id, chunks_fts.rank AS score FROM chunks_fts "
+            f"SELECT ch.id AS chunk_id, ch.chunk_text, {self.locator_sql()} AS locator, f.path AS file_path, "
+            "p.name AS project_name, p.id AS project_id, chunks_fts.rank AS score FROM chunks_fts "
             "JOIN chunks ch ON ch.id = chunks_fts.rowid JOIN files f ON f.id = ch.file_id "
             "LEFT JOIN projects p ON p.id = f.project_id WHERE chunks_fts MATCH ?"
         )

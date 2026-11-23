@@ -8,14 +8,18 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import documents
 from .config import Config
+from .documents import DOC_EXT, Section
 from .storage import Store
 
 TEXT_EXT = {
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb", ".c", ".cpp", ".h", ".hpp",
-    ".cs", ".php", ".swift", ".kt", ".scala", ".r", ".jl", ".sql", ".sh", ".ps1",
-    ".md", ".rst", ".txt", ".tex", ".org", ".adoc",
-    ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".html", ".css", ".scss", ".vue", ".svelte",
+    ".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs", ".java", ".go", ".rs", ".rb", ".c", ".cc",
+    ".cpp", ".h", ".hpp", ".cu", ".cuh", ".cs", ".php", ".swift", ".kt", ".kts", ".scala", ".r",
+    ".jl", ".sql", ".sh", ".bash", ".zsh", ".ps1", ".lua", ".dart", ".m", ".f90", ".zig", ".ex",
+    ".exs", ".erl", ".hs", ".ml", ".clj", ".nim", ".pl", ".el", ".proto", ".graphql", ".tf",
+    ".md", ".mdx", ".rst", ".txt", ".tex", ".bib", ".org", ".adoc", ".rmd", ".qmd", ".typ",
+    ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".css", ".scss", ".vue", ".svelte",
     ".ipynb",
 }
 
@@ -57,6 +61,8 @@ class IngestStats:
     files_indexed: int = 0
     files_skipped: int = 0
     chunks: int = 0
+    docs: int = 0                 # PDFs / Office / EPUB / HTML indexed this run
+    docs_unsupported: int = 0     # PDFs seen but skipped because no PDF backend is installed
     fields: dict[str, int] = field(default_factory=dict)
 
 
@@ -70,35 +76,73 @@ def _hash(p: Path) -> str:
     return h.hexdigest()
 
 
-def chunk_text(text: str, target: int = 1200, overlap: int = 150) -> list[str]:
-    """Paragraph-aware chunking with overlap; deterministic, no deps."""
-    text = text.replace("\r\n", "\n")
+def chunk_spans(text: str, target: int = 1200, overlap: int = 150) -> list[tuple[int, int]]:
+    """(start, end) offsets of each chunk in `text`, whitespace-trimmed. Paragraph-aware with overlap;
+    deterministic, no deps. Expects `\\n` line endings."""
+    def trimmed(a: int, b: int) -> tuple[int, int] | None:
+        seg = text[a:b]
+        s = seg.strip()
+        if not s:
+            return None
+        a2 = a + (len(seg) - len(seg.lstrip()))
+        return a2, a2 + len(s)
+
     if len(text) <= target:
-        return [text.strip()] if text.strip() else []
+        t = trimmed(0, len(text))
+        return [t] if t else []
     out, start = [], 0
     while start < len(text):
         end = min(start + target, len(text))
         nl = text.rfind("\n", start + target // 2, end)
         if nl != -1 and end < len(text):
             end = nl
-        seg = text[start:end].strip()
-        if seg:
-            out.append(seg)
+        t = trimmed(start, end)
+        if t:
+            out.append(t)
         start = max(end - overlap, end) if end >= len(text) else end - overlap
         if start <= 0:
             break
     return out
 
 
-def _read(p: Path) -> str:
+def chunk_text(text: str, target: int = 1200, overlap: int = 150) -> list[str]:
+    text = text.replace("\r\n", "\n")
+    return [text[a:b] for a, b in chunk_spans(text, target, overlap)]
+
+
+def chunk_sections(sections: list[Section], target: int = 1200, overlap: int = 150) -> list[tuple[str, str]]:
+    """(chunk text, locator) for every chunk of every section; chunks never straddle sections."""
+    out: list[tuple[str, str]] = []
+    for sec in sections:
+        for a, b in chunk_spans(sec.text, target, overlap):
+            out.append((sec.text[a:b], documents.span_locator(sec, a, b)))
+    return out
+
+
+def _sections(p: Path, ocr: bool = False) -> list[Section]:
+    ext = p.suffix.lower()
+    if ext in DOC_EXT:
+        return documents.extract(p, ocr=ocr)
     try:
-        if p.suffix.lower() == ".ipynb":
+        if ext == ".ipynb":
             import json
             nb = json.loads(p.read_text(encoding="utf-8", errors="ignore"))
-            return "\n\n".join("".join(c.get("source", [])) for c in nb.get("cells", []))
-        return p.read_text(encoding="utf-8", errors="ignore")
+            cells = ["".join(c.get("source", [])).replace("\r\n", "\n") for c in nb.get("cells", [])]
+            return [documents.notebook_section(cells)]
+        return [documents.text_section(p.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n"))]
     except Exception:
-        return ""
+        return []
+
+
+def _read(p: Path) -> str:
+    return "\n\n".join(s.text for s in _sections(p))
+
+
+def wanted(p: Path) -> bool:
+    if p.name.startswith(("~$", ".~")):                 # Office/LibreOffice lock files
+        return False
+    ext = p.suffix.lower()
+    return ext in TEXT_EXT or documents.supported(p)
 
 
 # Strong structural signals — a file extension or manifest is worth several token hits.
@@ -205,7 +249,8 @@ def discover_projects(root: Path, cfg: Config, *, max_depth: int = MAX_PROJECT_D
         if depth >= max_depth or not is_container(d, max_depth - depth):
             return [(d, True)]
         out: list[tuple[Path, bool]] = []
-        if any(p.is_file() and p.suffix.lower() in TEXT_EXT for p in d.iterdir()):
+        if any(p.is_file() and (p.suffix.lower() in TEXT_EXT or p.suffix.lower() in DOC_EXT)
+               for p in d.iterdir()):
             out.append((d, False))
         for k in _subdirs(d, cfg.ignore):
             out.extend(walk(k, depth + 1))
@@ -244,12 +289,20 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None, p
         if removed and progress:
             progress(f"pruned {removed} stale project(s) under {root}")
     max_bytes = int(cfg.max_file_mb * 1_000_000)
+    max_doc_bytes = int(cfg.max_doc_mb * 1_000_000)
     for proj, recursive in projects:
         walker = proj.rglob("*") if recursive else proj.iterdir()
-        files = [p for p in walker if p.is_file() and p.suffix.lower() in TEXT_EXT
-                 and not _is_ignored(p, cfg.ignore)]
+        files = []
+        for p in walker:
+            if not p.is_file() or _is_ignored(p, cfg.ignore):
+                continue
+            if wanted(p):
+                files.append(p)
+            elif p.suffix.lower() == ".pdf":
+                st.docs_unsupported += 1
         if not files:
             continue
+        text_files = [p for p in files if p.suffix.lower() not in DOC_EXT]
         # Structural signals for field inference: extension histogram + manifest files present.
         exts: dict[str, int] = {}
         manifests: set[str] = set()
@@ -260,20 +313,23 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None, p
                     manifests.add(p.name.lower())
         # Content sample: READMEs in full + the head of several source files (richer than first-5).
         blob = ""
-        readmes = [p for p in files if p.name.lower().startswith("readme")]
+        readmes = [p for p in text_files if p.name.lower().startswith("readme")]
         for p in readmes[:2]:
             blob += " " + _read(p)[:8000]
-        for p in files[:20]:
+        for p in text_files[:20]:
             blob += " " + _read(p)[:800]
+        if not text_files:
+            blob += " " + " ".join(p.stem for p in files[:200])
         fld = infer_field(proj.name, blob, exts=exts, manifests=manifests, focus=cfg.field_focus)
         pid = store.upsert_project(project_name(root, proj), str(proj), fld)
         st.projects += 1
         st.fields[fld] = st.fields.get(fld, 0) + 1
         for p in files:
             st.files_seen += 1
+            is_doc = p.suffix.lower() in DOC_EXT
             try:
                 fst = p.stat()
-                if fst.st_size > max_bytes:
+                if fst.st_size > (max_doc_bytes if is_doc else max_bytes):
                     st.files_skipped += 1
                     continue
                 prev = store.file_state(pid, str(p))
@@ -288,11 +344,13 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None, p
             if fid is None:
                 st.files_skipped += 1
                 continue
-            chunks = chunk_text(_read(p))
-            if chunks:
-                store.add_chunks(fid, chunks)
-                st.chunks += len(chunks)
+            pairs = chunk_sections(_sections(p, ocr=cfg.ocr))
+            if pairs:
+                store.add_chunks(fid, [t for t, _ in pairs], locators=[loc for _, loc in pairs])
+                st.chunks += len(pairs)
             st.files_indexed += 1
+            if is_doc:
+                st.docs += 1
             if progress and st.files_indexed % 200 == 0:
                 progress(f"{st.files_indexed} files, {st.chunks} chunks ...")
     _link_shared_fields(store)
