@@ -1,0 +1,55 @@
+CHANGELOG.md
+  s_9597705f0f5f64::t_39aedd2c3fc9ac 7-8
+README.md
+  s_9597705f0f5f64::t_a8e00dfe2e5e02 41-45
+  s_9597705f0f5f64::t_abc4b3918cac17 3
+cartograph/viz/app.py
+  s_9597705f0f5f64::t_d8ec01d6e4cfb6 27-28
+  s_9597705f0f5f64::t_e0666675168af5 183-184
+MANIFEST.in
+  s_9597705f0f5f64::t_4daece0c7a3d8c 2
+cartograph/viz/index.html
+  s_9597705f0f5f64::t_373bc94686af8e 7-8
+  s_9597705f0f5f64::t_133ce28ee4e2d7 83
+  s_9597705f0f5f64::t_88cabf971d5e19 113,115
+pyproject.toml
+  s_9597705f0f5f64::t_6e8dc9bab59c84 80
+tests/test_atlas.py
+  s_9597705f0f5f64::t_a972ea3dd8681c 7
+  s_9597705f0f5f64::t_8d7c65df78d889 60-61
+  s_9597705f0f5f64::t_86203db38c17d5 62-64
+scripts/brand.py
+  s_9597705f0f5f64::t_8aa2bc335aee8c 156
+  s_9597705f0f5f64::t_05782421afab24 207
+  s_9597705f0f5f64::t_f30d01ec4f6b1a 168-171
+  s_9597705f0f5f64::t_e6ce014d716194 287-302
+  s_9597705f0f5f64::t_66a4403d414922 152
+  s_9597705f0f5f64::t_6abedbeb1dfc40 310,318
+  s_9597705f0f5f64::t_1c4be901f7c4a3 186
+  s_9597705f0f5f64::t_9040e9a887d779 202-206,208-210
+  s_9597705f0f5f64::t_c85a8bd555c480 1-151,153-155,157-167,172-185,187-201,211-286,303-309,311-317,319-326
+cartograph/viz/favicon.svg
+  s_9597705f0f5f64::t_add4324a640eab 1-66
+cartograph/viz/moley.svg
+  s_9597705f0f5f64::t_70e46e40cea5b1 1-66
+docs/assets/banner.svg
+  s_9597705f0f5f64::t_61f82636b5cec2 1-66
+docs/assets/moley.svg
+  s_9597705f0f5f64::t_443604ed2e4ac0 1-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "185ecc45700701a759ed27ca9cf818b840f361b0",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
