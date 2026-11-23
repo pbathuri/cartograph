@@ -95,6 +95,39 @@ TOOLS = [
                      "project": _d(_STR, "Project name to describe."),
                      "kind": _d(_STR, "Restrict to one kind.", enum=["package", "paper", "repo", "model", "dataset"]),
                      "limit": _d(_INT, "Max facts (default 20).", minimum=1, maximum=200)})},
+    {"name": "brief",
+     "description": "Session-start memory digest for the project being worked on: its active decisions, "
+                    "rejected approaches (don't retry them), preferences, open todos, recent sessions, and "
+                    "memories whose anchored files changed. Call at the start of a task. Bounded by max_chars.",
+     "schema": _obj({"cwd": _d(_STR, "The working directory (picks the project)."),
+                     "project": _d(_STR, "Project name, if known."),
+                     "max_chars": _d(_INT, "Character budget (default 2000).", minimum=200, maximum=20000)})},
+    {"name": "recall",
+     "description": "Search the user's shared agent memory (decisions, rejected approaches, preferences, facts, "
+                    "todos, session logs). Active memories only unless history=true; each result says if it "
+                    "may be stale because a file it depends on changed.",
+     "schema": _obj({"query": _d(_STR, "Keywords (empty = newest)."),
+                     "project": _d(_STR, "Project name."), "cwd": _d(_STR, "Working directory (picks the project)."),
+                     "kinds": _d(_STRS, "Restrict to kinds: decision, rejected, preference, fact, todo, note, session."),
+                     "history": _d({"type": "boolean"}, "Include superseded memories."),
+                     "limit": _d(_INT, "Max results (default 10).", minimum=1, maximum=100),
+                     "max_chars": _d(_INT, "Cap on total text returned (0 = none).", minimum=0)})},
+    {"name": "remember", "writes": True,
+     "description": "Save something every future session (in any client) should know: a decision and why, an "
+                    "approach that was tried and rejected, a user preference, a fact, a todo. Anchor it to the "
+                    "files it depends on so it's flagged stale when they change. Returns similar existing "
+                    "memories; supersede them if this one replaces them.",
+     "schema": _obj({"text": _d(_STR, "The memory, self-contained (include the why)."),
+                     "kind": _d(_STR, "Memory kind.", enum=["decision", "rejected", "preference", "fact", "todo", "note"]),
+                     "project": _d(_STR, "Project name."), "cwd": _d(_STR, "Working directory (picks the project)."),
+                     "anchors": _d(_STRS, "File paths this memory depends on."),
+                     "supersedes": _d({"type": "array", "items": {"type": "integer"}}, "Memory ids this replaces."),
+                     "source": _d(_STR, "Client name, e.g. claude-code, cursor.")}, ("text",))},
+    {"name": "supersede", "writes": True,
+     "description": "Mark a memory as no longer true (kept as history with its validity interval), optionally "
+                    "pointing at the memory that replaces it.",
+     "schema": _obj({"id": _d(_INT, "Memory to close."), "by": _d(_INT, "Replacement memory id."),
+                     "reason": _d(_STR, "Why it no longer holds.")}, ("id",))},
     {"name": "graph_stats",
      "description": "Counts in your graph (projects/files/chunks/edges/entities) and the semantic index state.",
      "schema": _obj({})},
@@ -207,7 +240,8 @@ def _run(rid: Any, name: str, args: dict) -> str:
         from .embed import index_status
         st = index_status()
         from .entities import counts
-        return _resp(rid, {**store.stats(), **counts(store),
+        from .memory import stats as mstats
+        return _resp(rid, {**store.stats(), **counts(store), **mstats(store),
                            "index": {k: st.get(k) for k in ("state", "done", "total", "running")}})
     if name == "entities":
         from . import entities as E
@@ -263,6 +297,23 @@ def _run(rid: Any, name: str, args: dict) -> str:
     if name == "constellation":
         from .compass import compass_for_prompt
         return _resp(rid, compass_for_prompt(store, args.get("prompt") or ""))
+    if name in ("brief", "recall", "remember", "supersede"):
+        from . import memory as M
+        if name == "brief":
+            return _resp(rid, M.brief(store, project=args.get("project"), cwd=args.get("cwd"),
+                                      max_chars=int(args.get("max_chars", 2000))))
+        if name == "recall":
+            return _resp(rid, M.recall(store, args.get("query") or "", project=args.get("project"),
+                                       cwd=args.get("cwd"), kinds=_names(args.get("kinds")) or None,
+                                       history=bool(args.get("history")), limit=int(args.get("limit", 10)),
+                                       max_chars=int(args.get("max_chars", 0))))
+        rw = Store(db_path())
+        if name == "remember":
+            return _resp(rid, M.remember(rw, args.get("text", ""), args.get("kind") or "note",
+                                         project=args.get("project"), cwd=args.get("cwd"),
+                                         anchors=_names(args.get("anchors")), source=args.get("source") or "mcp",
+                                         supersedes=[int(x) for x in _names(args.get("supersedes"))]))
+        return _resp(rid, M.supersede(rw, int(args["id"]), args.get("by"), args.get("reason") or ""))
     if name == "record_use":
         from .persona import record_feedback
         from .persona.profile import load_persona

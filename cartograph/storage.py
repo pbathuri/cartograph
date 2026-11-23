@@ -54,6 +54,28 @@ CREATE TABLE IF NOT EXISTS mentions (
 CREATE INDEX IF NOT EXISTS idx_mentions_file ON mentions(file_id);
 """
 
+# Temporal agent memory (see memory.py): rows are never overwritten, only closed by valid_to/superseded_by.
+MEMORY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS memories (
+    id INTEGER PRIMARY KEY, kind TEXT NOT NULL, text TEXT NOT NULL, project_id INTEGER,
+    source TEXT, session TEXT, anchors TEXT, tags TEXT, confidence REAL DEFAULT 1.0,
+    created_at REAL NOT NULL, valid_from REAL NOT NULL, valid_to REAL, superseded_by INTEGER, reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project_id, valid_to);
+CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(source, session);
+CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(text, tags, content='memories', content_rowid='id');
+CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+    INSERT INTO memories_fts(rowid, text, tags) VALUES (new.id, new.text, new.tags);
+END;
+CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+    INSERT INTO memories_fts(memories_fts, rowid, text, tags) VALUES ('delete', old.id, old.text, old.tags);
+END;
+CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE OF text, tags ON memories BEGIN
+    INSERT INTO memories_fts(memories_fts, rowid, text, tags) VALUES ('delete', old.id, old.text, old.tags);
+    INSERT INTO memories_fts(rowid, text, tags) VALUES (new.id, new.text, new.tags);
+END;
+"""
+
 # Columns added after v1. Existing graphs gain them in place (ADD COLUMN is O(1) in SQLite); NULL means
 # "not recorded yet" and every reader treats it that way.
 MIGRATIONS = {
@@ -79,6 +101,7 @@ class Store:
             with self.cursor() as c:
                 c.executescript(SCHEMA)
                 c.executescript(ENTITY_SCHEMA)
+                c.executescript(MEMORY_SCHEMA)
                 _migrate(c)
 
     @contextmanager
