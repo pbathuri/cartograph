@@ -40,6 +40,20 @@ CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id);
 CREATE INDEX IF NOT EXISTS idx_edges_src ON edges(src_id, relation);
 """
 
+# Deterministic entities + their evidence (see entities.py). Separate so read-only callers can check for it.
+ENTITY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS entities (
+    id INTEGER PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(kind, name)
+);
+CREATE TABLE IF NOT EXISTS mentions (
+    entity_id INTEGER NOT NULL, file_id INTEGER NOT NULL, relation TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0, evidence_chunk INTEGER, confidence REAL, extractor TEXT,
+    first_seen REAL, last_seen REAL,
+    PRIMARY KEY (entity_id, file_id, relation)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_mentions_file ON mentions(file_id);
+"""
+
 # Columns added after v1. Existing graphs gain them in place (ADD COLUMN is O(1) in SQLite); NULL means
 # "not recorded yet" and every reader treats it that way.
 MIGRATIONS = {
@@ -64,6 +78,7 @@ class Store:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.cursor() as c:
                 c.executescript(SCHEMA)
+                c.executescript(ENTITY_SCHEMA)
                 _migrate(c)
 
     @contextmanager
@@ -137,6 +152,7 @@ class Store:
         """Remove a project with its files, chunks (FTS rows follow via trigger) and edges."""
         with self.cursor() as c:
             c.execute("DELETE FROM chunks WHERE file_id IN (SELECT id FROM files WHERE project_id=?)", (project_id,))
+            c.execute("DELETE FROM mentions WHERE file_id IN (SELECT id FROM files WHERE project_id=?)", (project_id,))
             c.execute("DELETE FROM files WHERE project_id=?", (project_id,))
             c.execute("DELETE FROM edges WHERE src_id=? OR dst_id=?", (project_id, project_id))
             c.execute("DELETE FROM projects WHERE id=?", (project_id,))
@@ -196,6 +212,14 @@ class Store:
                 cache[table] = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
         return column in cache[table]
 
+    def has_table(self, table: str) -> bool:
+        cache = self.__dict__.setdefault("_tables", {})
+        if table not in cache:
+            with self.cursor() as c:
+                cache[table] = c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                                         (table,)).fetchone() is not None
+        return cache[table]
+
     def locator_sql(self, alias: str = "ch") -> str:
         return f"{alias}.locator" if self.has_column("chunks", "locator") else "NULL"
 
@@ -247,8 +271,8 @@ class Store:
                 nodes.append({"id": f"p{d['id']}", "label": d["name"], "field": d["field"] or "",
                               "size": min(40, 8 + (d["nf"] or 0) // 5), "kind": "project"})
             pid = {n["id"] for n in nodes}
-            for r in c.execute("SELECT src_id, relation, dst_id FROM edges "
-                               "WHERE relation='PROJECT_RELATED_TO_PROJECT' LIMIT 2000").fetchall():
+            for r in c.execute("SELECT src_id, relation, dst_id FROM edges WHERE relation IN "
+                               "('PROJECT_RELATED_TO_PROJECT', 'PROJECT_SHARES_ENTITY') LIMIT 4000").fetchall():
                 s, d = f"p{r['src_id']}", f"p{r['dst_id']}"
                 if s in pid and d in pid:
                     edges.append({"source": s, "target": d, "relation": r["relation"]})
