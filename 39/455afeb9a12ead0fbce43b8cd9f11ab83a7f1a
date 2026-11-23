@@ -1,0 +1,22 @@
+cartograph/scout.py
+  s_be1d481cef2701::t_0b898578cdd8b2 49-95,101-103
+  s_be1d481cef2701::t_d37c4d73eb6a23 137-139
+tests/test_graph_improve.py
+  s_be1d481cef2701::t_58b8881c345286 143-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "39455afeb9a12ead0fbce43b8cd9f11ab83a7f1a",
+  "prompts": {},
+  "sessions": {
+    "s_be1d481cef2701": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fff7d6d4-2f7e-4623-80d9-8a03be997819",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
