@@ -1,0 +1,71 @@
+cartograph/viz/app.py
+  s_9597705f0f5f64::t_631e4224eac87d 97-99,179,181-184,186-200
+  s_9597705f0f5f64::t_15cebad03b4e42 74-75
+  s_9597705f0f5f64::t_b460b07c139edb 290-305
+  s_9597705f0f5f64::t_d3bd0aa21f6e6f 27-42,44-45,47-73,76-78,105-109
+  s_f801b3bb28960d::t_025447c89353ce 43,46,79-96,100-104,185,306
+cartograph/storage.py
+  s_9597705f0f5f64::t_9aa35321bc8de8 6
+  s_9597705f0f5f64::t_e36f7b875c950d 302,304,310
+  s_f801b3bb28960d::t_cefc015c3d428d 298,303,305-309
+README.md
+  s_9597705f0f5f64::t_8a6134fd849b92 178,180-183,185
+  s_9597705f0f5f64::t_d273df7b4c6c2e 3,5-7,9-13,15-16,22,24-28,30,32-38,40-44,46,49-52,55,58,61-62,64,66,69-92,94-97,99-170,172-174,176,187-193,195,197-198,201-202,204-205,207,209-215,217-218,220,222-225,227,229,231-233,237
+  s_9597705f0f5f64::t_41f3153ecf11b1 68,93,199-200,203
+tests/test_connect.py
+  s_9597705f0f5f64::t_6ff07a093bba0e 1-99
+scripts/atlas_showcase.py
+  s_9597705f0f5f64::t_f4582adba84bb2 38-75
+  s_9597705f0f5f64::t_fd6910fa31247e 118-121
+  s_9597705f0f5f64::t_ab2fe758929ec8 1-37,76-117,122-143,148-151
+  s_9597705f0f5f64::t_5ee02d311afd1a 144-147
+tests/test_atlas.py
+  s_9597705f0f5f64::t_9223286a63b0f9 1-92
+cartograph/connect.py
+  s_9597705f0f5f64::t_626a449445e64d 1-215
+cartograph/viz/index.html
+  s_9597705f0f5f64::t_a027de86fb4e94 6-7,9-75,79-91,93-98,100,102-117,119-135,139-140,142-163,165-180,182-197,199-201,203-206,208,210-222,224-259,261-279,281,283,298-369,373,375,377,379,381-384,387-388,391-438
+  s_9597705f0f5f64::t_8d13797f649a18 280,282,284-297
+  s_9597705f0f5f64::t_3a6b78b21a5652 389
+  s_9597705f0f5f64::t_4becbbd6e5693c 136-138,181,198,202,207,209,260,370-372,374,376,385-386
+CHANGELOG.md
+  s_9597705f0f5f64::t_59b42dfa1c43e1 5-7,86-109
+MANIFEST.in
+  s_9597705f0f5f64::t_0fc1fcd2869ffe 2
+cartograph/__init__.py
+  s_9597705f0f5f64::t_d6ef984909cca6 4
+cartograph/cli.py
+  s_9597705f0f5f64::t_1d94c6da6c1fbd 695,760-764,935-976
+cartograph/embed.py
+  s_9597705f0f5f64::t_2fe4a96250349f 27-28,30-31
+cartograph/entities.py
+  s_9597705f0f5f64::t_c1df802ba27bbd 54-55,110-114,342,345-346
+cartograph/retrieve.py
+  s_9597705f0f5f64::t_a27e60372c7939 60
+pyproject.toml
+  s_9597705f0f5f64::t_a5f3facaeae962 8-9,14-15,17-20,22,24-27,29,63-64,80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6b5b862c3948fb018595199bc84935590c79cc1e",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    },
+    "s_f801b3bb28960d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d302d533-830a-4531-9f44-979845e9dff2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
