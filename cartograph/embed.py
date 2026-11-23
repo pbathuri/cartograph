@@ -5,7 +5,8 @@ to nothing if `cartograph[semantic]` isn't installed, so the base product works 
 Builds are resumable: a killed `carto index` picks up from the rows it already wrote. The user's first
 configured roots are embedded first, and a build in progress is already searchable.
 
-Brute-force is fine to a few million chunks (~150ms/query). Past that, swap in FAISS — see docs."""
+Brute force is exact and fine to a few hundred thousand chunks; past ~100k embedded rows an IVF-PQ layer
+(ann.py, NumPy-only) keeps queries in the tens of milliseconds."""
 from __future__ import annotations
 
 import json
@@ -215,7 +216,7 @@ def index_status() -> dict:
 
 
 def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress=None, full: bool = False,
-                progress_every: int = 8) -> dict:
+                progress_every: int = 8, ann_every: int = 1_000_000) -> dict:
     """Embed chunks -> index/{vectors.npy, chunk_ids.npy, project_ids.npy}.
 
     Incremental by default: vectors of chunks already in the last complete index are copied, only new
@@ -269,6 +270,11 @@ def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress
     todo = todo[~done[todo]]
 
     total, base = len(ids), int(done.sum())
+    from . import ann as _ann
+    ann_every = ann_every if _ann.available() else 0
+    next_ann = base + ann_every if ann_every else 0
+    if ann_every and base >= _ann.MIN_ROWS and not (tmp / _ann.ANN_DIR).exists():
+        next_ann = base                                      # resumed build without an ANN yet: make one now
     t0 = time.time()
     _write_progress(tmp, pid=os.getpid(), done=base, total=total, embedded=0, rate=0.0, started=t0,
                     updated=t0, model=cfg.embed_model)
@@ -281,6 +287,18 @@ def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress
         texts = [DOC_PREFIX + (text.get(k) or "")[:600] for k in want]
         emb = model.encode(texts, normalize_embeddings=True, batch_size=batch)
         vecs[sel] = emb.astype("float16")
+        done[sel] = True
+        if ann_every and base + i + batch >= next_ann:
+            next_ann += ann_every
+            vecs.flush()
+            _write_progress(tmp, pid=os.getpid(), done=base + min(i + batch, len(todo)), total=total,
+                            embedded=min(i + batch, len(todo)), rate=0.0, started=t0, updated=time.time(),
+                            model=cfg.embed_model, phase="refreshing ANN")
+            try:
+                _ann.build(tmp, rows=np.nonzero(done)[0], progress=progress)
+            except Exception as e:  # noqa: BLE001 - ANN is an accelerator, never fail the build over it
+                if progress:
+                    progress(f"ANN refresh skipped: {e}")
         if b % progress_every == 0 or i + batch >= len(todo):
             n_emb = min(i + batch, len(todo))
             now = time.time()
@@ -293,6 +311,12 @@ def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress
                 progress(f"embedded {n_emb}/{len(todo)} new chunks ({reused} reused, {resumed} resumed)")
     vecs.flush()
     del vecs, state, old_vecs                                 # Windows can't rename dirs with open maps
+    if _ann.available() and total >= _ann.MIN_ROWS:
+        try:
+            _ann.build(tmp, rows=np.arange(total), progress=progress)
+        except Exception as e:  # noqa: BLE001
+            if progress:
+                progress(f"ANN build skipped: {e}")
     (tmp / "progress.json").unlink(missing_ok=True)
     _swap_in(tmp, out)
     return {"vectors": len(ids), "embedded": int(len(todo)), "reused": reused, "resumed": resumed,
@@ -338,24 +362,73 @@ class SemanticIndex:
         self.building = not _complete(d)
         if self.building:
             d = building_dir()
+        self.dir = d
         self.vectors = np.load(d / "vectors.npy", mmap_mode="r")
         self.chunk_ids = np.load(d / "chunk_ids.npy")
         self.project_ids = np.load(d / "project_ids.npy")
         self.cfg = cfg
+        self.ann = None
+        from .ann import Ann
+        self._ann_ok = Ann.usable(d, len(self.chunk_ids))
+        self.signature = SemanticIndex.current_signature()
+
+    @property
+    def mode(self) -> str:
+        return "ann" if self._ann_ok else "exact"
+
+    def _load_ann(self) -> None:
+        if self._ann_ok and self.ann is None:
+            from .ann import Ann
+            try:
+                self.ann = Ann(self.dir)
+            except Exception:
+                self._ann_ok = False
 
     @staticmethod
     def exists() -> bool:
         return _complete(index_dir()) or _complete(building_dir())
 
+    @staticmethod
+    def current_signature() -> tuple:
+        """Changes when the index is swapped in or its ANN layer is rebuilt (long-lived servers reload)."""
+        out = []
+        for d in (index_dir(), building_dir()):
+            for name in ("chunk_ids.npy", "ann.json"):
+                try:
+                    out.append((d / name).stat().st_mtime)
+                except OSError:
+                    out.append(None)
+        return tuple(out)
+
+    def _exact_top(self, qv, fetch: int, block: int = 262_144):
+        import numpy as np
+        n = self.vectors.shape[0]
+        idx_parts, sim_parts = [], []
+        for i in range(0, n, block):
+            s = np.asarray(self.vectors[i:i + block], dtype=np.float32) @ qv
+            k = min(fetch, s.shape[0])
+            top = np.argpartition(-s, k - 1)[:k]
+            idx_parts.append(top + i)
+            sim_parts.append(s[top])
+        idx, sims = np.concatenate(idx_parts), np.concatenate(sim_parts)
+        order = np.argsort(-sims)[:fetch]
+        return idx[order], sims[order]
+
     def _ranked(self, query: str, fetch: int):
         import numpy as np
         qv = _model(self.cfg.embed_model).encode([QUERY_PREFIX + query], normalize_embeddings=True)[0]
-        sims = np.asarray(self.vectors @ qv.astype("float16"))
-        fetch = min(fetch, sims.shape[0])
-        idx = np.argpartition(-sims, fetch - 1)[:fetch]
-        idx = idx[np.argsort(-sims[idx])]
+        qv = np.asarray(qv, dtype=np.float32)
+        fetch = min(fetch, self.vectors.shape[0])
+        self._load_ann()
+        if self.ann is not None:
+            cand = np.sort(self.ann.candidates(qv, max(fetch, 2000)))
+            sims = np.asarray(self.vectors[cand], dtype=np.float32) @ qv
+            order = np.argsort(-sims)[:fetch]
+            idx, sims = cand[order], sims[order]
+        else:
+            idx, sims = self._exact_top(qv, fetch)
         if self.building:
-            idx = idx[sims[idx] > 0]
+            idx = idx[sims > 0]
         return idx
 
     def search_chunk_ids(self, query: str, top_k: int = 30, fetch: int = 400) -> list[int]:

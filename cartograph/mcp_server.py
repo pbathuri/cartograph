@@ -38,11 +38,18 @@ def _d(schema: dict, description: str, **extra) -> dict:
 
 TOOLS = [
     {"name": "retrieve_context",
-     "description": "BEST retrieval for injecting context: hybrid (semantic + keyword) over your whole "
-                    "graph. Returns the relevant code/doc snippets (text+file+project). Use this to pull "
-                    "context into a prompt.",
+     "description": "BEST retrieval for injecting context: hybrid (semantic + keyword) over the user's whole "
+                    "graph — code, notes, PDFs, Office docs. Every snippet has a `cite` (file:L40-88, paper.pdf "
+                    "p.12). Set mode=mix with max_tokens for one budgeted bundle of relevant memories, entity "
+                    "facts and snippets.",
      "schema": _obj({"query": _d(_STR, "What to find."),
-                     "top_k": _d(_INT, "How many snippets (default 8).", minimum=1, maximum=50)}, ("query",))},
+                     "top_k": _d(_INT, "How many snippets (default 8).", minimum=1, maximum=50),
+                     "mode": _d(_STR, "chunks (default): snippets. mix: memories + entity facts + snippets. "
+                                      "graph: entity facts. memory: agent memories. projects: ranked projects.",
+                                enum=["chunks", "mix", "graph", "memory", "projects"]),
+                     "max_tokens": _d(_INT, "Hard token budget for the whole result (default 2000 when mode is set).",
+                                      minimum=200, maximum=50000),
+                     "cwd": _d(_STR, "Working directory, scopes memories to its project.")}, ("query",))},
     {"name": "relevant_projects",
      "description": "Which of your projects/repos are most relevant to a query (hybrid ranked).",
      "schema": _obj({"query": _d(_STR, "What the task is about."),
@@ -260,6 +267,11 @@ def _run(rid: Any, name: str, args: dict) -> str:
         query = args.get("query", "")
         if not query:
             return _resp(rid, error="query is required")
+        if name == "retrieve_context" and (args.get("mode") or args.get("max_tokens")):
+            from .retrieve import context
+            return _resp(rid, context(query, store, cfg, mode=args.get("mode") or "chunks",
+                                      max_tokens=int(args.get("max_tokens") or 2000),
+                                      top_k=int(args.get("top_k", 8)), cwd=args.get("cwd")))
         res = retrieve(query, store, cfg, top_k=int(args.get("top_k", 8)))
         if name == "relevant_projects":
             return _resp(rid, {"method": res.method, "projects": res.projects})
