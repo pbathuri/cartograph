@@ -95,5 +95,8 @@ def test_dry_run_and_status(home):
     st = {s["client"]: s for s in C.status()}
     assert st["cursor"]["detected"] and not st["cursor"]["connected"]
     assert not st["windsurf"]["detected"]
+    assert not st["claude-code"]["detected"] or C.shutil.which("claude")
+    (home / ".claude").mkdir()
+    assert C.detected("claude-code")
     with pytest.raises(ValueError):
         C.connect("nope")

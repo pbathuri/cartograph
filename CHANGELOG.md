@@ -2,6 +2,10 @@
 
 All notable changes to Cartograph (`cartograph__v1`) are documented here. Versioning is semantic.
 
+## [2.0.1] — 2026-11-23
+- `carto connect` no longer reports Claude Code as installed on every machine (its config lives in
+  `$HOME`); it now looks for `~/.claude.json`, `~/.claude/` or the `claude` command.
+
 ## [2.0.0] — 2026-11-23
 Documents with citations, a graph with provenance, memory every agent shares, and an Atlas to see it.
 No LLM is needed to build any of it.

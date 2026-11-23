@@ -70,6 +70,8 @@ def config_path(client: str) -> Path:
 def detected(client: str) -> bool:
     """The client looks installed: its config file, or the folder it lives in, exists."""
     p = config_path(client)
+    if client == "claude-code":                       # ~/.claude.json lives in $HOME, which always exists
+        return p.exists() or (Path.home() / ".claude").is_dir() or shutil.which("claude") is not None
     if CLIENTS[client][2] == "continue":
         return p.parent.parent.exists()
     return p.exists() or p.parent.exists()
