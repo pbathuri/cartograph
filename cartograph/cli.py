@@ -679,6 +679,23 @@ def eval_cmd(queries: int = typer.Option(300, "--queries"), tune: bool = typer.O
                                  progress=lambda m: console.print(f"  {m}", style="dim"))))
 
 
+@app.command()
+def bench(suite: list[str] = typer.Option(["citations", "scifact"], "--suite",
+                                          help="citations (bundled PDF/DOCX/PPTX/MD/PY corpus) and/or scifact (BEIR)."),
+          semantic: bool = typer.Option(False, "--semantic", help="Also embed and score hybrid retrieval."),
+          limit: int = typer.Option(0, "--limit", help="Only the first N SciFact queries (0 = all)."),
+          as_json: bool = typer.Option(False, "--json")) -> None:
+    """Reproducible benchmarks in a throwaway home (never touches your graph); prints a Markdown table."""
+    from .bench import markdown, run
+    rep = run(list(suite), semantic=semantic, limit=limit or None,
+              progress=lambda m: console.print(f"  {m}", style="dim"))
+    if as_json:
+        console.print_json(json.dumps(rep))
+    else:
+        console.print(markdown(rep), markup=False)
+        console.print(f"results: {rep['path']}", style="dim")
+
+
 @app.command("mcp-server")
 def mcp_server(read_only: bool = typer.Option(False, "--read-only",
                                               help="Expose only tools that never write (hides feedback/memory tools).")

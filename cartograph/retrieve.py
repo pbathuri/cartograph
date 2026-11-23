@@ -19,9 +19,16 @@ from .storage import Store
 _FTS_BAD = re.compile(r"[^\w\s]")
 
 
+_COMPOUND = re.compile(r"\b\w+(?:[-./:]\w+)+\b")
+
+
 def sanitize(q: str) -> str:
+    """FTS5 query: every word as an OR term, plus identifiers like IL-6, KX-417, CVE-2024-1234 or
+    torch.nn as exact phrases, so their pieces matching elsewhere don't outrank the real thing."""
     toks = [t for t in _FTS_BAD.sub(" ", q).split() if len(t) >= 2]
-    return " OR ".join(f'"{t}"' for t in toks)
+    phrases = [" ".join(_FTS_BAD.sub(" ", m).split()) for m in _COMPOUND.findall(q)]
+    terms = [f'"{t}"' for t in toks] + [f'"{p}"' for p in dict.fromkeys(phrases) if " " in p]
+    return " OR ".join(terms)
 
 
 def rrf_fuse(rankings: list[list[Any]], top_k: int, k: int = 60) -> list[Any]:

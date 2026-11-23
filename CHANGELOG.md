@@ -58,6 +58,29 @@ All notable changes to Cartograph (`cartograph__v1`) are documented here. Versio
 - MCP tools `brief`, `recall` (read-only) and `remember`, `supersede` (write; hidden by `--read-only`).
 - CLI: `carto memory add | recall | supersede | forget | brief`, `carto hooks install | uninstall | status`.
 
+### Retrieval with hard budgets
+- **Modes**: `mix` (memories + graph facts + cited chunks), `chunks`, `projects`, `graph`, `memory` — on
+  `carto retrieve --mode` and the `retrieve_context` MCP tool.
+- **`max_tokens` is a hard cap**: text is trimmed at paragraph/sentence boundaries and the lowest-ranked
+  items are dropped until the whole payload fits. Near-duplicate chunks of the same file are collapsed.
+- **Fast semantic search on millions of chunks without new dependencies**: an IVF-PQ index in pure NumPy
+  (`carto index --ann`, built automatically for 100k+ rows) with exact rescoring of the candidates.
+  On a 6.5M-chunk graph: 7 ms p50 / 11 ms p95 versus 8–10 s for brute force, tie-aware recall@10 0.99.
+  (FAISS was rejected: on macOS its OpenMP runtime collides with PyTorch's.)
+- A rebuilt index is picked up by a running MCP server without a restart.
+- Identifiers such as `IL-6`, `KX-417`, `CVE-2024-1234` or `torch.nn` are also matched as exact phrases, so
+  their fragments appearing elsewhere no longer outrank the real thing.
+
+### Reproducible benchmarks
+- **`carto bench`** runs in a throwaway home (your graph is never touched) and prints a Markdown table:
+  - **BEIR SciFact** (5,183 abstracts, 300 labelled queries): nDCG@10, recall@10/100, MRR@10, latency, for
+    keyword and (`--semantic`) hybrid retrieval. Downloads from BEIR or, when that host is down, the Hugging
+    Face mirror.
+  - **Citations**: a generated library of PDFs, Word files, slide decks, notes and code with planted facts on
+    known pages, sections, slides and lines; scores whether the top result is the right file *and* the
+    citation points at the right place.
+- Results are kept per day in `~/.cartograph/bench/results-<date>.json`.
+
 ### Change detection
 - Files are hashed in full (v1 hashed only the first 1 MB, so edits past it went unnoticed). Files up to
   1 MB keep their v1 hash, so upgrading re-chunks only the 1–2 MB files that could have been stale.
