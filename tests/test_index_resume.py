@@ -148,6 +148,59 @@ def test_legacy_partial_build_resumes_only_if_graph_unchanged(tmp_path, fake):
     assert res["resumed"] == 0 and res["reused"] == 4      # partial build refused; prior index reused
 
 
+def test_graph_change_mid_build_carries_finished_rows_over(tmp_path, fake):
+    store = _corpus(tmp_path, [("a", "alpha", 6), ("b", "beta", 4)])
+    cfg = Config(roots=[str(tmp_path / "a"), str(tmp_path / "b")])
+    with pytest.raises(Boom):
+        embed.build_index(store, cfg, batch=4, progress=lambda m: (_ for _ in ()).throw(Boom()), progress_every=1)
+    pid = store.upsert_project("gamma", str(tmp_path / "a" / "gamma"), "general")   # a nightly ingest lands
+    store.add_chunks(store.upsert_file(pid, "g.md", ".md", "gamma"), [f"gamma chunk {i}" for i in range(3)])
+    fake.calls = 0
+    res = embed.build_index(store, cfg, batch=4)
+    assert res["carried"] == 4 and res["vectors"] == 13
+    assert fake.calls == 9                                 # the 4 finished rows were not re-embedded
+    assert not (index_dir().parent / "index.carried").exists()
+    carried = np.load(index_dir() / "vectors.npy").copy()
+    embed.build_index(store, cfg, batch=4, full=True)
+    assert np.array_equal(carried, np.load(index_dir() / "vectors.npy"))
+
+
+def test_second_builder_leaves_a_live_build_alone(tmp_path, fake):
+    store = _corpus(tmp_path, [("a", "alpha", 6)])
+    cfg = Config(roots=[str(tmp_path / "a")])
+    with pytest.raises(Boom):
+        embed.build_index(store, cfg, batch=2, progress=lambda m: (_ for _ in ()).throw(Boom()), progress_every=1)
+    building = index_dir().parent / "index.building"
+    before = np.load(building / "vectors.npy").copy()
+    embed._lock_path().write_text(str(os.getppid()))      # another live process holds the build
+    with pytest.raises(embed.BuildRunning):
+        embed.build_index(store, cfg, batch=2, full=True)
+    assert np.array_equal(before, np.load(building / "vectors.npy"))
+
+
+def test_lock_of_a_dead_builder_is_taken_over(tmp_path, fake):
+    import subprocess
+    import sys
+    store = _corpus(tmp_path, [("a", "alpha", 3)])
+    cfg = Config(roots=[str(tmp_path / "a")])
+    dead = subprocess.Popen([sys.executable, "-c", "pass"])
+    dead.wait()
+    embed._lock_path().write_text(str(dead.pid))
+    assert embed.build_index(store, cfg, batch=2)["vectors"] == 3
+    assert not embed._lock_path().exists()
+
+
+def test_nightly_improve_skips_the_index_while_a_build_runs(tmp_path, fake, monkeypatch):
+    from cartograph import improve
+    _corpus(tmp_path, [("a", "alpha", 3)])
+    monkeypatch.setattr(embed, "available", lambda: True)
+    embed._lock_path().write_text(str(os.getppid()))
+    rep = improve.run(do_ingest=False, do_scout=False, do_tune=False, max_queries=0)
+    step = rep["steps"]["index"]
+    assert step["ok"] and "already running" in step["result"]["skipped"]
+    assert (improve._reports_dir() / "latest.json").exists()
+
+
 def test_progress_file_reports_counts(tmp_path, fake):
     store = _corpus(tmp_path, [("a", "alpha", 6)])
     cfg = Config(roots=[str(tmp_path / "a")])

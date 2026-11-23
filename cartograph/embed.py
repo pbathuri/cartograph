@@ -65,12 +65,60 @@ def _dim(model) -> int:
 
 def _default_batch(model) -> int:
     dev = str(getattr(model, "device", "cpu"))
-    return 256 if dev.startswith("cuda") else 64
+    return 256 if dev.startswith("cuda") else 128 if dev.startswith("mps") else 64
 
 
 def building_dir() -> Path:
     out = index_dir()
     return out.parent / (out.name + ".building")
+
+
+def _carried_dir() -> Path:
+    out = index_dir()
+    return out.parent / (out.name + ".carried")
+
+
+def _lock_path() -> Path:
+    out = index_dir()
+    return out.parent / (out.name + ".lock")
+
+
+class BuildRunning(RuntimeError):
+    """Another live process is building the index; a second builder would destroy its work."""
+
+    def __init__(self, pid: int) -> None:
+        super().__init__(f"an index build is already running (pid {pid})")
+        self.pid = pid
+
+
+def _acquire_lock() -> Path:
+    """Claim the single-builder lock, or raise BuildRunning. A lock left by a dead process is taken over."""
+    p = _lock_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(3):
+        try:
+            fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                pid = int(p.read_text().strip() or 0)
+            except (OSError, ValueError):
+                pid = 0
+            if pid and pid != os.getpid() and pid_alive(pid):
+                raise BuildRunning(pid) from None
+            p.unlink(missing_ok=True)
+            continue
+        with os.fdopen(fd, "w") as f:
+            f.write(str(os.getpid()))
+        return p
+    raise BuildRunning(0)
+
+
+def _release_lock(p: Path) -> None:
+    try:
+        if int(p.read_text().strip() or 0) == os.getpid():
+            p.unlink()
+    except (OSError, ValueError):
+        pass
 
 
 def _complete(d: Path) -> bool:
@@ -215,15 +263,59 @@ def index_status() -> dict:
     return {"state": "none", "done": 0, "total": 0, "running": False}
 
 
-def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress=None, full: bool = False,
-                progress_every: int = 8, ann_every: int = 1_000_000) -> dict:
+def _copy_by_id(src_ids, src_vecs, src_ok, ids, vecs, done) -> int:
+    """Copy src rows into `vecs` wherever the chunk id matches and the row isn't done; marks them done.
+    `src_ok` (optional) masks src rows that were actually written."""
+    import numpy as np
+    if src_ids is None or not len(src_ids):
+        return 0
+    order = np.argsort(src_ids)
+    sorted_ids = src_ids[order]
+    pos = np.clip(np.searchsorted(sorted_ids, ids), 0, len(src_ids) - 1)
+    hit = (sorted_ids[pos] == ids) & ~done
+    if src_ok is not None:
+        hit &= src_ok[order[pos]]
+    dst = np.nonzero(hit)[0]
+    src = order[pos[hit]]
+    for i in range(0, len(dst), 200_000):                     # copy in slices to bound memory
+        vecs[dst[i:i + 200_000]] = src_vecs[src[i:i + 200_000]]
+    done |= hit
+    return int(hit.sum())
+
+
+def _load_partial(d: Path, dim: int):
+    """(chunk_ids, vectors memmap) of an unfinished build that recorded its ids, or (None, None)."""
+    import numpy as np
+    try:
+        ids = np.load(d / "chunk_ids.npy")
+        vecs = np.load(d / "vectors.npy", mmap_mode="r")
+        if vecs.shape == (len(ids), dim):
+            return ids, vecs
+    except Exception:
+        pass
+    return None, None
+
+
+def build_index(store: Store, cfg: Config, **kw) -> dict:
     """Embed chunks -> index/{vectors.npy, chunk_ids.npy, project_ids.npy}.
 
     Incremental by default: vectors of chunks already in the last complete index are copied, only new
     chunks are embedded (a changed file gets new chunk ids, so it is re-embedded; deleted chunks drop out).
-    Resumable: an interrupted build continues from the rows it already wrote (unless `full`).
+    Resumable: an interrupted build continues from the rows it already wrote (unless `full`), even if the
+    graph changed in between: finished rows are carried over by chunk id.
+    One builder at a time: raises BuildRunning while another live process holds the lock, because a
+    second builder would delete the first one's folder.
     Text is fetched per batch instead of loading the whole corpus into memory. The new index is written
     to a temp folder and swapped in at the end, so an interrupted run leaves the previous index intact."""
+    lock = _acquire_lock()
+    try:
+        return _build_index(store, cfg, **kw)
+    finally:
+        _release_lock(lock)
+
+
+def _build_index(store: Store, cfg: Config, *, batch: int | None = None, progress=None, full: bool = False,
+                 progress_every: int = 8, ann_every: int = 1_000_000) -> dict:
     import shutil
 
     import numpy as np
@@ -241,10 +333,18 @@ def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress
     del rows
     dim = _dim(model)
     tmp = building_dir()
+    carried = _carried_dir()
+    if full and carried.exists():
+        shutil.rmtree(carried)
     state = None if full or not tmp.exists() else _resume(tmp, ids, dim)
     if state is None:
         if tmp.exists():
-            shutil.rmtree(tmp)
+            if not full and (tmp / "chunk_ids.npy").exists():   # the graph changed: keep its rows to carry over
+                if carried.exists():
+                    shutil.rmtree(carried)
+                tmp.rename(carried)
+            else:
+                shutil.rmtree(tmp)
         tmp.mkdir(parents=True)
         vecs = np.lib.format.open_memmap(tmp / "vectors.npy", mode="w+", dtype=np.float16, shape=(len(ids), dim))
         done = np.zeros(len(ids), dtype=bool)
@@ -254,18 +354,20 @@ def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress
     np.save(tmp / "project_ids.npy", pids)
     resumed = int(done.sum())
 
+    n_carried = 0
+    if carried.exists():
+        c_ids, c_vecs = _load_partial(carried, dim)
+        if c_ids is not None:
+            n_carried = _copy_by_id(c_ids, c_vecs, _filled_rows(c_vecs), ids, vecs, done)
+            vecs.flush()
+        del c_ids, c_vecs                                     # Windows can't delete a mapped file
+        shutil.rmtree(carried, ignore_errors=True)
+        if progress and n_carried:
+            progress(f"carried over {n_carried} rows from the unfinished build")
+    resumed += n_carried
+
     old_ids, old_vecs = (None, None) if full else _load_previous(out, dim)
-    reused = 0
-    if old_ids is not None and len(old_ids):
-        order = np.argsort(old_ids)
-        pos = np.clip(np.searchsorted(old_ids[order], ids), 0, len(old_ids) - 1)
-        hit = (old_ids[order][pos] == ids) & ~done
-        src = order[pos[hit]]
-        dst = np.nonzero(hit)[0]
-        for i in range(0, len(dst), 200_000):                 # copy in slices to bound memory
-            vecs[dst[i:i + 200_000]] = old_vecs[src[i:i + 200_000]]
-        reused = int(hit.sum())
-        done |= hit
+    reused = _copy_by_id(old_ids, old_vecs, None, ids, vecs, done)
     todo = _priority(store, cfg, pids)
     todo = todo[~done[todo]]
 
@@ -320,7 +422,7 @@ def build_index(store: Store, cfg: Config, *, batch: int | None = None, progress
     (tmp / "progress.json").unlink(missing_ok=True)
     _swap_in(tmp, out)
     return {"vectors": len(ids), "embedded": int(len(todo)), "reused": reused, "resumed": resumed,
-            "dim": dim, "dir": str(out)}
+            "carried": n_carried, "dim": dim, "dir": str(out)}
 
 
 def _swap_in(tmp: Path, out: Path, attempts: int = 10) -> None:
