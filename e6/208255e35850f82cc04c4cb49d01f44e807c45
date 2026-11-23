@@ -1,0 +1,44 @@
+cartograph/evals.py
+  s_be1d481cef2701::t_1466d682e54f20 1-226
+cartograph/scout.py
+  s_be1d481cef2701::t_e86d26d4b15a16 1-208
+cartograph/improve.py
+  s_be1d481cef2701::t_2cf4ef574b0622 1-145
+cartograph/elite/methods.py
+  s_be1d481cef2701::t_d651f549af7af0 1-147
+tests/test_graph_improve.py
+  s_be1d481cef2701::t_c45ca755704b08 1-28,33-142
+  s_be1d481cef2701::t_bb7085e42991f2 29-32
+cartograph/cli.py
+  s_be1d481cef2701::t_15ac3d2fe942ea 523-576
+cartograph/config.py
+  s_be1d481cef2701::t_86bdf19474641f 41-43,49-50
+cartograph/graphnet.py
+  s_be1d481cef2701::t_e294c8dcf48b02 1-274
+cartograph/mcp_server.py
+  s_be1d481cef2701::t_b5f89fcc7760e3 52-57,150-161
+cartograph/persona/profile.py
+  s_be1d481cef2701::t_3e426435596fb0 130
+cartograph/persona/steer.py
+  s_be1d481cef2701::t_b4fa748e6a0393 34-35,113-144,163,244-250,252-261,266-289,302-304
+cartograph/retrieve.py
+  s_be1d481cef2701::t_52a3c34e40cfdd 70-71,78-83,95
+cartograph/tuning.py
+  s_be1d481cef2701::t_3e4762fbccfabd 1-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e6208255e35850f82cc04c4cb49d01f44e807c45",
+  "prompts": {},
+  "sessions": {
+    "s_be1d481cef2701": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fff7d6d4-2f7e-4623-80d9-8a03be997819",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
