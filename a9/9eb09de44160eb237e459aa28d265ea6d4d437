@@ -1,0 +1,50 @@
+cartograph/progress_view.py
+  s_9597705f0f5f64::t_94b27a9b6247f3 1-74
+cartograph/ingest.py
+  s_9597705f0f5f64::t_08062e99e5daf1 64-65,67-69
+  s_9597705f0f5f64::t_c19fa259c83f2f 275-276,279-283,287
+cartograph/cli.py
+  s_9597705f0f5f64::t_cfbc78ddefdecc 598-601,603
+  s_9597705f0f5f64::t_df4cebb0ed6bdf 687-692
+  s_9597705f0f5f64::t_0aa4f980b4559a 157-161,163-168,173-183,189-190
+cartograph/__main__.py
+  s_9597705f0f5f64::t_c753ce245d543a 1-3
+cartograph/embed.py
+  s_9597705f0f5f64::t_b04c75aeeba891 170-195,205
+  s_9597705f0f5f64::t_d80addafc11e30 2-6,11-14,16,22,52-56,60-78,92-169,196-204,206-218,223,230,240-255,260-261,267-276,284-293,296,303-304,308-310,314-316,324,332-335
+tests/test_mcp_contract.py
+  s_9597705f0f5f64::t_83ac08fabfbb92 70-72,76-80
+  s_9597705f0f5f64::t_fce826a169d0ec 1-36,40-69,73-75
+  s_9597705f0f5f64::t_0258073ab7425a 37-39
+tests/test_file_fingerprint.py
+  s_9597705f0f5f64::t_5b4f88abf7c8e0 1-77
+cartograph/storage.py
+  s_9597705f0f5f64::t_7ad4a9afb5dd6f 43-56,66
+  s_9597705f0f5f64::t_e1efc1045327a3 92-101,105-106,110,112-113
+tests/test_index_resume.py
+  s_9597705f0f5f64::t_86c785598626d6 1-146,149-157
+  s_9597705f0f5f64::t_151d59d8ae5ff7 147-148
+CHANGELOG.md
+  s_9597705f0f5f64::t_ff5c0ed38862bd 5-34
+cartograph/mcp_server.py
+  s_9597705f0f5f64::t_bced467b61de2d 1-5,12,14,21-38,44-45,48-49,53-54,58,65-68,74-75,78-81,87,89-90,92-100,102-103,105-112,115,121-138,148-149,153-154,156,161-167,171,175-176,178-186,189-191,194-248,252-254,262-263,273
+  s_9597705f0f5f64::t_d090be680496aa 192-193
+cartograph/background.py
+  s_9597705f0f5f64::t_174c451d9ccfb5 1-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a99eb09de44160eb237e459aa28d265ea6d4d437",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
