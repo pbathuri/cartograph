@@ -38,12 +38,16 @@ class Config:
     ])
     max_file_mb: float = 2.0
     project_containers: list[str] = field(default_factory=list)  # extra folder names that hold several projects
+    scout_topics: list[str] = field(default_factory=list)   # always scout these (frontier papers/repos)
+    scout_exclude: list[str] = field(default_factory=list)  # never send these terms to arXiv/GitHub
+    scout_pdf_dir: str = ""                                 # where top arXiv PDFs go ("" = don't download)
     embed_model: str = "nomic-ai/nomic-embed-text-v1.5"
 
     def to_dict(self) -> dict[str, Any]:
         return {"roots": self.roots, "field_focus": self.field_focus, "ignore": self.ignore,
                 "max_file_mb": self.max_file_mb,
-                "project_containers": self.project_containers, "embed_model": self.embed_model}
+                "project_containers": self.project_containers, "scout_topics": self.scout_topics,
+                "scout_exclude": self.scout_exclude, "scout_pdf_dir": self.scout_pdf_dir, "embed_model": self.embed_model}
 
 
 def load_config() -> Config:
