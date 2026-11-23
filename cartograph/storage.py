@@ -40,6 +40,20 @@ CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id);
 CREATE INDEX IF NOT EXISTS idx_edges_src ON edges(src_id, relation);
 """
 
+# Columns added after v1. Existing graphs gain them in place (ADD COLUMN is O(1) in SQLite); NULL means
+# "not recorded yet" and every reader treats it that way.
+MIGRATIONS = {
+    "files": (("size", "INTEGER"), ("mtime", "REAL")),
+}
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    for table, cols in MIGRATIONS.items():
+        have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+        for name, decl in cols:
+            if name not in have:
+                c.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
 
 class Store:
     def __init__(self, path: str | Path, read_only: bool = False) -> None:
@@ -49,6 +63,7 @@ class Store:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.cursor() as c:
                 c.executescript(SCHEMA)
+                _migrate(c)
 
     @contextmanager
     def cursor(self) -> Iterator[sqlite3.Connection]:
@@ -74,17 +89,28 @@ class Store:
                 c.execute("UPDATE projects SET field=? WHERE name=? AND (field='' OR field IS NULL)", (field, name))
             return c.execute("SELECT id FROM projects WHERE name=?", (name,)).fetchone()[0]
 
-    def upsert_file(self, project_id: int, path: str, ext: str, hash_: str) -> int | None:
+    def file_state(self, project_id: int, path: str) -> dict | None:
+        """The stored fingerprint of a file (hash, size, mtime), or None if it was never ingested."""
+        with self.cursor() as c:
+            row = c.execute("SELECT * FROM files WHERE project_id=? AND path=?", (project_id, path)).fetchone()
+        return dict(row) if row else None
+
+    def upsert_file(self, project_id: int, path: str, ext: str, hash_: str,
+                    size: int | None = None, mtime: float | None = None) -> int | None:
+        """Insert or update a file row. Returns the file id when its chunks must be (re)written, or None
+        when the content is unchanged (its size/mtime are refreshed so the next run can skip reading it)."""
         with self.cursor() as c:
             row = c.execute("SELECT id, hash FROM files WHERE project_id=? AND path=?", (project_id, path)).fetchone()
             if row and row["hash"] == hash_:
+                if size is not None:
+                    c.execute("UPDATE files SET size=?, mtime=? WHERE id=?", (size, mtime, row["id"]))
                 return None  # unchanged -> skip
             if row:
                 c.execute("DELETE FROM chunks WHERE file_id=?", (row["id"],))
-                c.execute("UPDATE files SET hash=? WHERE id=?", (hash_, row["id"]))
+                c.execute("UPDATE files SET hash=?, size=?, mtime=? WHERE id=?", (hash_, size, mtime, row["id"]))
                 return row["id"]
-            cur = c.execute("INSERT INTO files(project_id, path, ext, hash) VALUES(?,?,?,?)",
-                            (project_id, path, ext, hash_))
+            cur = c.execute("INSERT INTO files(project_id, path, ext, hash, size, mtime) VALUES(?,?,?,?,?,?)",
+                            (project_id, path, ext, hash_, size, mtime))
             return cur.lastrowid
 
     def ensure_file(self, project_id: int, path: str, ext: str = "screen") -> int:

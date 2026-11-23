@@ -61,8 +61,12 @@ class IngestStats:
 
 
 def _hash(p: Path) -> str:
+    """SHA-1 of the whole file, streamed. (Files <= 1 MB hash exactly as the v1 first-MB hash did,
+    so upgrading re-chunks only files whose tail could have changed unnoticed.)"""
     h = hashlib.sha1()
-    h.update(p.read_bytes()[:1_000_000])
+    with p.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
     return h.hexdigest()
 
 
@@ -268,13 +272,19 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None, p
         for p in files:
             st.files_seen += 1
             try:
-                if p.stat().st_size > max_bytes:
+                fst = p.stat()
+                if fst.st_size > max_bytes:
                     st.files_skipped += 1
                     continue
+                prev = store.file_state(pid, str(p))
+                if prev and prev.get("size") == fst.st_size and prev.get("mtime") == fst.st_mtime:
+                    st.files_skipped += 1                 # same size + mtime: unchanged, don't even read it
+                    continue
+                digest = _hash(p)
             except OSError:
                 st.files_skipped += 1
                 continue
-            fid = store.upsert_file(pid, str(p), p.suffix.lower(), _hash(p))
+            fid = store.upsert_file(pid, str(p), p.suffix.lower(), digest, size=fst.st_size, mtime=fst.st_mtime)
             if fid is None:
                 st.files_skipped += 1
                 continue

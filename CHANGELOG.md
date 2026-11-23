@@ -2,6 +2,36 @@
 
 All notable changes to Cartograph (`cartograph__v1`) are documented here. Versioning is semantic.
 
+## [Unreleased] — 2.0 series
+
+### Index you can trust on a big corpus
+- **Resumable builds.** A killed `carto index` continues from the rows it already wrote instead of
+  starting over (it used to wipe a partial build). Partial builds record their chunk ids; one left by an
+  older version is resumed only when the graph hasn't been written since it began.
+- **Your work first.** Chunks are embedded in the order of your configured roots, smaller projects first
+  within a root, so your own folders become searchable hours before bulk reference clones.
+- **Searchable while building.** Retrieval uses the partial index (unfinished rows are zero vectors and
+  never outrank real matches) instead of silently falling back to keyword-only.
+- **`carto index --background`** runs detached from the terminal or agent session that started it;
+  **`carto index --status [--watch]`** shows a live progress panel (count, rate, ETA, resume hint).
+- An `index/` folder missing `chunk_ids.npy` is no longer treated as a usable index.
+- fp16 inference on CUDA/MPS (~15% faster on Apple silicon, identical vectors at float16 storage).
+
+### Change detection
+- Files are hashed in full (v1 hashed only the first 1 MB, so edits past it went unnoticed). Files up to
+  1 MB keep their v1 hash, so upgrading re-chunks only the 1–2 MB files that could have been stale.
+- Size + mtime are stored per file; unchanged files are skipped without being read.
+- Existing graphs are migrated in place (`ALTER TABLE ... ADD COLUMN`, no rebuild).
+
+### MCP
+- Real JSON Schemas: array parameters (`record_use.helped`) are `array` of `string`, integers are integers.
+- Tool `annotations` (`readOnlyHint`, `destructiveHint`, ...) distinguish retrieval from tools that write
+  local state; `carto mcp-server --read-only` hides the writers.
+- Tool failures come back as `isError` results (spec behaviour) rather than JSON-RPC errors; protocol
+  version negotiation (2024-11-05 / 2025-03-26 / 2025-06-18); `ping`.
+- A long-running server that outlives an upgrade heals stale imports instead of failing every call.
+- Clear message when no graph exists yet. `python -m cartograph` works.
+
 ## [1.0.0] — 2026-06-15
 First public release. A local-first personal cognitive graph you point at your own folders and plug into
 your AI agents.

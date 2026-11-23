@@ -154,20 +154,40 @@ def ingest(
 
 
 @app.command()
-def index(full: bool = typer.Option(False, "--full", help="Re-embed every chunk instead of only new ones.")) -> None:
+def index(full: bool = typer.Option(False, "--full", help="Re-embed every chunk instead of only new ones."),
+          background: bool = typer.Option(False, "--background", "-b",
+                                          help="Run detached (survives closing the terminal); log in ~/.cartograph/logs."),
+          status: bool = typer.Option(False, "--status", help="Show progress of a running/finished build."),
+          watch: bool = typer.Option(False, "--watch", help="With --status: live progress bar until it finishes.")) -> None:
     """Build the semantic vector index (needs `pip install cartograph__v1[semantic]`). Re-run after ingest;
-    only chunks added since the last index are embedded."""
-    from .embed import available, build_index
+    only chunks added since the last index are embedded, and an interrupted build resumes where it stopped."""
+    from .embed import available, build_index, index_status
+    if status or watch:
+        from .progress_view import show_index_status
+        show_index_status(index_status, watch=watch, console=console)
+        return
     if not available():
         console.print(r"[yellow]semantic extra not installed.[/yellow] "
                       r"Run: [bold]pip install 'cartograph__v1\[semantic]'[/bold] (adds ~2GB; GPU-accelerated if present).")
         raise typer.Exit(1)
+    st = index_status()
+    if st.get("state") == "building" and st.get("running"):
+        console.print(f"[yellow]an index build is already running[/yellow] (pid {st.get('pid')}). "
+                      "Watch it with [bold]carto index --status --watch[/bold].")
+        raise typer.Exit(1)
+    if background:
+        from .background import spawn
+        log = spawn(["index"] + (["--full"] if full else []), "index")
+        console.print(f"[green]✓ index build started in the background[/green] — log: {log}\n"
+                      "  watch: [bold]carto index --status --watch[/bold]")
+        return
     cfg = load_config()
     console.print("[bold]building semantic index[/bold] (first run downloads the model) …")
     res = build_index(_store(read_only=True), cfg, full=full,
                       progress=lambda m: console.print(f"  {m}", style="dim"))
     console.print(f"[green]✓ indexed[/green] {res.get('vectors', 0)} chunks "
-                  f"({res.get('embedded', 0)} embedded, {res.get('reused', 0)} reused) -> {res.get('dir', index_dir())}")
+                  f"({res.get('embedded', 0)} embedded, {res.get('reused', 0)} reused, "
+                  f"{res.get('resumed', 0)} resumed) -> {res.get('dir', index_dir())}")
 
 
 @app.command()
@@ -575,10 +595,12 @@ def eval_cmd(queries: int = typer.Option(300, "--queries"), tune: bool = typer.O
 
 
 @app.command("mcp-server")
-def mcp_server() -> None:
-    """Run the MCP server (stdio) so Claude Code / Cursor can query your graph. See README."""
+def mcp_server(read_only: bool = typer.Option(False, "--read-only",
+                                              help="Expose only tools that never write (hides feedback/memory tools).")
+               ) -> None:
+    """Run the MCP server (stdio) so Claude Code / Cursor / Codex / any MCP client can query your graph."""
     from .mcp_server import serve
-    serve()
+    serve(read_only_mode=read_only)
 
 
 @app.command()
@@ -662,7 +684,12 @@ def doctor() -> None:
     console.print(f"workspace: {home()}")
     console.print(f"graph db : {'present' if db_path().exists() else 'not built (run carto ingest)'}")
     console.print(r"semantic : " + ("enabled" if sem_ok() else r"off — pip install 'cartograph__v1\[semantic]'"))
-    console.print(f"index    : {'built' if (index_dir()/'vectors.npy').exists() else 'not built (carto index)'}")
+    from .embed import index_status
+    ist = index_status()
+    console.print("index    : " + {"complete": "built",
+                                   "building": f"building {ist.get('done', 0):,}/{ist.get('total', 0):,}"
+                                               + ("" if ist.get("running") else " (paused — `carto index` resumes)"),
+                                   }.get(ist["state"], "not built (carto index)"))
     try:
         import torch
         console.print(f"torch    : {torch.__version__}  cuda={torch.cuda.is_available()}")
