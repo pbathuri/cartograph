@@ -520,6 +520,60 @@ def stats() -> None:
         console.print(f"  {k:10s} {v:,}")
 
 
+@app.command()
+def improve(
+    no_ingest: bool = typer.Option(False, "--no-ingest"), no_scout: bool = typer.Option(False, "--no-scout"),
+    no_index: bool = typer.Option(False, "--no-index"), no_tune: bool = typer.Option(False, "--no-tune"),
+    queries: int = typer.Option(400, "--queries", help="AutoLog eval queries to use."),
+    rollback: bool = typer.Option(False, "--rollback", help="Restore the parameters before the last accepted tune."),
+) -> None:
+    """Daily self-improvement: ingest -> scout -> index -> graph -> persona -> eval+tune -> report."""
+    if rollback:
+        from .tuning import rollback as _rb
+        prev = _rb()
+        console.print(f"[green]restored[/green] {prev}" if prev else "[yellow]nothing to roll back[/yellow]")
+        return
+    from .improve import run
+    rep = run(do_ingest=not no_ingest, do_scout=not no_scout, do_index=not no_index, do_tune=not no_tune,
+              max_queries=queries, progress=lambda m: console.print(f"  {m}", style="dim"))
+    ev = rep["steps"].get("eval_tune", {}).get("result") or {}
+    if ev.get("ok"):
+        console.print(f"holdout MRR {ev['holdout_live'].get('mrr')} -> {ev['holdout_candidate'].get('mrr')}, "
+                      f"brief recall {ev['holdout_live'].get('brief_recall')} -> {ev['holdout_candidate'].get('brief_recall')}, "
+                      f"tokens {ev['holdout_live'].get('brief_tokens')} -> {ev['holdout_candidate'].get('brief_tokens')} "
+                      f"| accepted: {ev['accepted']}")
+    console.print(f"report: {rep['report']}")
+
+
+@app.command()
+def graph() -> None:
+    """Rebuild the project graph (semantic similarity + AutoLog co-activity edges, activity prior)."""
+    from .graphnet import build_graph
+    console.print(json.dumps(build_graph(_store(), load_config(), progress=lambda m: console.print(f"  {m}", style="dim")), indent=2))
+
+
+@app.command()
+def scout(topic: list[str] = typer.Option(None, "--topic", help="Scout these instead of auto topics."),
+          dry_run: bool = typer.Option(False, "--dry-run", help="Only show the topics that would be searched.")) -> None:
+    """Pull arXiv papers + GitHub repos for your active professional topics into ~/.cartograph/frontier."""
+    from .scout import gather_topics, scout as _scout
+    cfg, store = load_config(), _store()
+    topics = list(topic) if topic else gather_topics(store, cfg)
+    if dry_run:
+        console.print("\n".join(topics) or "(no topics)")
+        return
+    pdf = Path(cfg.scout_pdf_dir).expanduser() if cfg.scout_pdf_dir else None
+    console.print(json.dumps(_scout(store, cfg, topics=topics, pdf_dir=pdf), indent=2))
+
+
+@app.command("eval")
+def eval_cmd(queries: int = typer.Option(300, "--queries"), tune: bool = typer.Option(False, "--tune")) -> None:
+    """Score retrieval on the self-supervised AutoLog relevance set (optionally tune + accept if better)."""
+    from .evals import dumps, run_eval
+    console.print(dumps(run_eval(_store(), load_config(), max_queries=queries, do_tune=tune,
+                                 progress=lambda m: console.print(f"  {m}", style="dim"))))
+
+
 @app.command("mcp-server")
 def mcp_server() -> None:
     """Run the MCP server (stdio) so Claude Code / Cursor can query your graph. See README."""

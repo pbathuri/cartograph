@@ -67,15 +67,20 @@ def _chunks_by_id(store: Store, ids: list[int]) -> dict[int, dict]:
     if not ids:
         return {}
     ph = ",".join("?" * len(ids))
-    sql = ("SELECT ch.id AS chunk_id, ch.chunk_text, f.path AS file_path, p.name AS project_name "
+    sql = ("SELECT ch.id AS chunk_id, ch.chunk_text, f.path AS file_path, p.name AS project_name, "
+           "p.id AS project_id "
            "FROM chunks ch JOIN files f ON f.id=ch.file_id LEFT JOIN projects p ON p.id=f.project_id "
            f"WHERE ch.id IN ({ph})")
     with store.cursor() as c:
         return {int(dict(r)["chunk_id"]): dict(r) for r in c.execute(sql, ids).fetchall()}
 
 
-def retrieve(query: str, store: Store, cfg: Config, *, top_k: int = 10) -> RetrieveResult:
-    """Hybrid chunk retrieval (RRF of semantic + FTS), collapsed to ranked projects + the snippets."""
+def retrieve(query: str, store: Store, cfg: Config, *, top_k: int = 10, rrf_k: int | None = None) -> RetrieveResult:
+    """Hybrid chunk retrieval (RRF of semantic + FTS), collapsed to ranked projects + the snippets.
+    `rrf_k` defaults to the tuned value (`carto improve`), else 60."""
+    if rrf_k is None:
+        from .tuning import load as _tuned
+        rrf_k = int(_tuned().get("rrf_k", 60))
     san = sanitize(query)
     fts_rows = store.search_chunks(san, limit=top_k * 3) if san else []
     sem_ids = _semantic_chunk_ids(cfg, query, top_k * 3)
@@ -87,7 +92,7 @@ def retrieve(query: str, store: Store, cfg: Config, *, top_k: int = 10) -> Retri
     for ranking in (sem_ids, [r["chunk_id"] for r in fts_rows]):
         for rank, key in enumerate(ranking, 1):
             if key is not None:
-                fscore[key] = fscore.get(key, 0.0) + 1.0 / (60 + rank)
+                fscore[key] = fscore.get(key, 0.0) + 1.0 / (rrf_k + rank)
     fused = [k for k, _ in sorted(fscore.items(), key=lambda t: t[1], reverse=True)][:top_k]
     chunks = []
     for i in fused:

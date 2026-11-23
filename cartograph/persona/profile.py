@@ -127,7 +127,7 @@ class PersonaProfile:
                 f"| steer α={self.learned_alpha:.2f}{sub}")
 
 
-REFERENCE_DIRS = ("References", "references", "third_party", "vendor")
+REFERENCE_DIRS = ("References", "references", "third_party", "vendor", "frontier")
 
 
 def build_from_corpus(store, *, reference_dirs: tuple[str, ...] | list[str] = REFERENCE_DIRS) -> PersonaProfile:

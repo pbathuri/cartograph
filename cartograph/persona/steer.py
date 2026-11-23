@@ -31,7 +31,8 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     project (always available) + preference-vector cosine (if a vector exists). Confidence-scaled.
     `alpha` defaults to the persona's LEARNED alpha (tuned from the record_use log).
     `tuning` (optional) overrides the steering knobs for ablation/config sweeps; defaults are production."""
-    T = tuning or {}
+    from ..tuning import load as _tuned
+    T = {**_tuned(), **(tuning or {})}                     # learned knobs (carto improve), overridable
     use_context = T.get("use_context", True)               # contextual vs global affinity
     use_gate = T.get("use_gate", True)                     # project-rank relevance gate
     use_protect = T.get("use_protect", True)               # top-hit protection
@@ -109,6 +110,38 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
         if i == 0:
             cd0 = cd
         scored.append([base + adj, ch])
+    # GRAPH PROPAGATION: personalized PageRank over the project graph (similarity + AutoLog co-activity),
+    # seeded by this query's per-project scores. Lifts projects that are relevant AND connected to what
+    # the user is actively doing; also yields related threads the query didn't name. Weight is learned.
+    related: list[dict] = []
+    if T.get("use_graph", True):
+        try:
+            from ..graphnet import load_graph
+            g = load_graph(store)
+        except Exception:
+            g = None
+        if g is not None:
+            seeds: dict[int, float] = {}
+            for sc, ch in scored:
+                pid = ch.get("project_id")
+                if pid is not None:
+                    seeds[int(pid)] = max(seeds.get(int(pid), 0.0), max(0.0, sc))
+            pr = g.ppr(seeds, damping=float(T.get("ppr_damping", 0.85)), prior_mix=float(T.get("prior_mix", 0.3)))
+            mx = max(pr.values(), default=0.0)
+            w_ppr = float(T.get("w_ppr", 0.0))
+            if w_ppr > 0 and mx > 0:
+                for item in scored:
+                    pid = item[1].get("project_id")
+                    if pid is not None:
+                        item[0] += w_ppr * pr.get(int(pid), 0.0) / mx
+            extra = [k for k, _ in sorted(pr.items(), key=lambda t: -t[1]) if k not in seeds][:5]
+            if extra:
+                ph = ",".join("?" * len(extra))
+                with store.cursor() as c:
+                    nm = {r["id"]: (r["name"], r["field"]) for r in
+                          c.execute(f"SELECT id, name, field FROM projects WHERE id IN ({ph})", extra)}
+                related = [{"project": nm[k][0], "field": nm[k][1], "ppr": round(pr[k] / mx, 3)}
+                           for k in extra if k in nm]
     # TOP-HIT PROTECTION (covers reranker, heuristic, AND cold start): the most-relevant result keeps the
     # top score UNLESS we're contextually-confident it's the wrong project for THIS kind of query. This is
     # what makes personalization do no harm (test_v1: it stops favored projects polluting clear queries),
@@ -127,7 +160,7 @@ def personalized_retrieve(prompt: str, store: Store, cfg: Config, persona: Perso
     method = res.method + ("+reranker" if reranker is not None else "+persona")
     return {"method": method, "chunks": out_chunks, "projects": projects,
             "personalized": True, "steer_confidence": round(steer_conf, 3),
-            "reranker": reranker is not None}
+            "reranker": reranker is not None, "related": related}
 
 
 def _chunk_vec(ch: dict, cfg: Config):
@@ -208,16 +241,52 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
             guidance.append(bit + ".")
     except Exception:
         constellation = {"has_map": False}
-    # assemble context, optionally trimmed to a char budget (drop trailing snippets to fit)
-    ctx, used, per = [], 0, 400
-    if max_chars and pr["chunks"]:
-        per = max(160, min(400, max_chars // max(1, len(pr["chunks"]))))
+    # assemble context: per-project snippet cap (diversity + tokens) and tuned snippet length, optionally
+    # trimmed to a char budget (drop trailing snippets to fit)
+    from ..tuning import load as _tuned
+    T = _tuned()
+    cap, per = int(T.get("snips_per_project", 2)), int(T.get("snippet_chars", 400))
+    chunks_in = []
+    seen_per: dict = {}
     for c in pr["chunks"]:
-        snip = (c.get("chunk_text") or "")[:per]
+        nm = c.get("project_name")
+        if seen_per.get(nm, 0) >= cap:
+            continue
+        seen_per[nm] = seen_per.get(nm, 0) + 1
+        chunks_in.append(c)
+    ctx, used = [], 0
+    if max_chars and chunks_in:
+        per = max(160, min(per, max_chars // max(1, len(chunks_in))))
+    for c in chunks_in:
+        snip = " ".join((c.get("chunk_text") or "").split())[:per]      # collapse whitespace: fewer tokens
         if max_chars and used + len(snip) > max_chars and ctx:
             break
         ctx.append({"project": c.get("project_name"), "file": c.get("file_path"), "snippet": snip})
         used += len(snip)
+    # hints: the textbook move + a worth-trying tangent for the technical area, frontier papers/repos the
+    # scout pulled for the user's active topics, and graph neighbours (related threads) of this query
+    hint_budget = int(T.get("hint_budget", 3))
+    methods, frontier = [], []
+    try:
+        from ..elite.methods import match_methods
+        methods = match_methods(prompt, limit=1 if hint_budget <= 2 else 2)
+    except Exception:
+        methods = []
+    try:
+        from ..scout import frontier_cards
+        frontier = frontier_cards(store, prompt, limit=hint_budget)
+    except Exception:
+        frontier = []
+    related = pr.get("related", [])[:3]
+    if methods:
+        guidance.append("Method hints below: apply the textbook move where it fits; propose a tangent only "
+                        "as a clearly-labelled optional experiment with a quick way to test it.")
+    if frontier:
+        guidance.append("Frontier items below were pulled for the user's active topics; cite one only if it "
+                        "concretely improves this task.")
+    if related:
+        guidance.append("Related threads (graph neighbours of this work): "
+                        + ", ".join(r["project"] for r in related) + " — reuse from them where relevant.")
     return {
         "prompt": prompt,
         "prompt_field": pfield,
@@ -230,6 +299,9 @@ def build_brief(prompt: str, store: Store, cfg: Config, persona: PersonaProfile,
         "relevant_context": ctx,
         "current_activity": activity,
         "constellation": constellation,
+        "method_hints": methods,
+        "frontier_hints": frontier,
+        "related_threads": related,
         "output_guidance": guidance,
         "note": "Prepend this to the model's context. Field-weight steering works with zero ML; the "
                 "preference vector sharpens it once `carto index` is built and feedback accrues.",

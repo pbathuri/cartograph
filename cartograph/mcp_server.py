@@ -49,6 +49,12 @@ TOOLS = [
                     "used Cartograph context in a useful answer.",
      "params": {"query": "string?", "helped": "string[] project names",
                 "not_helpful": "string[]? project names"}},
+    {"name": "frontier_hints",
+     "description": "Reasoning hints for the task at hand: the textbook method for its technical area "
+                    "(CUDA, time series, MD, signals, sparse, HPC, quant, ML), one worth-trying tangent with "
+                    "when-to-try, frontier papers/repos the scout pulled for the user's active topics, and "
+                    "related projects from the user's graph. Use when planning an implementation.",
+     "params": {"prompt": "string"}},
     {"name": "graph_stats",
      "description": "Counts in your graph (projects/files/chunks/edges).", "params": {}},
 ]
@@ -141,6 +147,18 @@ def _dispatch(rid: Any, name: str, args: dict) -> str:
             return _resp(rid, build_brief(prompt, store, cfg, load_persona(store),
                                           top_k=int(args.get("top_k", 6)),
                                           max_chars=int(args.get("max_chars", 0))))
+        if name == "frontier_hints":
+            from .elite.methods import match_methods
+            from .scout import frontier_cards
+            prompt = args.get("prompt", "")
+            out = {"methods": match_methods(prompt), "frontier": frontier_cards(store, prompt, limit=4)}
+            try:
+                from .persona import personalized_retrieve
+                from .persona.profile import load_persona
+                out["related"] = personalized_retrieve(prompt, store, cfg, load_persona(store), top_k=6).get("related", [])
+            except Exception:
+                out["related"] = []
+            return _resp(rid, out)
         if name == "constellation":
             from .compass import compass_for_prompt
             return _resp(rid, compass_for_prompt(store, args.get("prompt") or ""))
