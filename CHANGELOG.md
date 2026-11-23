@@ -4,6 +4,8 @@ All notable changes to Cartograph (`cartograph__v1`) are documented here. Versio
 
 ## [Unreleased]
 - The mascot is named Moley, after the mole in *The Wind in the Willows*.
+- Moley is redrawn as a crisp SVG badge, a nerdy mole holding a brass lantern, with a new README banner,
+  social card and a favicon that still reads at 16 px. `scripts/brand.py` rebuilds every brand asset from code.
 
 ## [2.0.1] — 2026-11-23
 - `carto connect` no longer reports Claude Code as installed on every machine (its config lives in

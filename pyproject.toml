@@ -77,4 +77,4 @@ per-file-ignores = { "cartograph/cli.py" = ["E402"] }
 include = ["cartograph*"]
 
 [tool.setuptools.package-data]
-"cartograph.viz" = ["*.html", "*.png"]
+"cartograph.viz" = ["*.html", "*.png", "*.svg"]

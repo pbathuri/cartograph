@@ -4,6 +4,7 @@ import json
 import socket
 import socketserver
 import threading
+import urllib.error
 import urllib.request
 
 import pytest
@@ -56,6 +57,11 @@ def test_page_and_assets(atlas):
     assert status == 200 and b"Cartograph Atlas" in html and b"unpkg.com" not in html   # works offline
     status, png, headers = _get(port, "/mascot.png")
     assert status == 200 and headers["Content-Type"] == "image/png" and png[:4] == b"\x89PNG"
+    status, svg, headers = _get(port, "/moley.svg")
+    assert status == 200 and headers["Content-Type"] == "image/svg+xml" and b"<svg" in svg
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _get(port, "/../app.py")
+    assert e.value.code == 404
 
 
 def test_atlas_has_projects_entity_hubs_and_stats(atlas):

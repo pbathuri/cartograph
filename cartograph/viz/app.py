@@ -24,7 +24,8 @@ from ..storage import Store
 
 _HTML = Path(__file__).with_name("index.html")
 _STUDIO = Path(__file__).with_name("studio.html")
-_STATIC = {"/mascot.png": "mascot.png", "/favicon.png": "favicon.png"}
+_STATIC = {"/mascot.png": "image/png", "/favicon.png": "image/png",
+           "/moley.svg": "image/svg+xml", "/favicon.svg": "image/svg+xml"}
 
 
 def _q(u, key: str, default: str = "") -> str:
@@ -179,8 +180,8 @@ def _make_handler():
             if u.path in ("/", "/index.html", "/atlas"):
                 return self._send(200, _HTML.read_bytes(), "text/html; charset=utf-8")
             if u.path in _STATIC:
-                f = Path(__file__).with_name(_STATIC[u.path])
-                return self._send(200, f.read_bytes(), "image/png") if f.exists() else self._send(404, b"")
+                f = Path(__file__).with_name(u.path.lstrip("/"))
+                return self._send(200, f.read_bytes(), _STATIC[u.path]) if f.exists() else self._send(404, b"")
             if u.path == "/api/atlas":
                 return self._send(200, atlas_json())
             if u.path == "/api/context":
