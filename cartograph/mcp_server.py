@@ -1,90 +1,141 @@
-"""Cartograph MCP server — plug your graph into any MCP client (Claude Code, Cursor, etc.).
-Stdio JSON-RPC; speaks the standard `initialize` / `tools/list` / `tools/call` methods. Read-only.
+"""Cartograph MCP server — plug your graph into any MCP client (Claude Code, Cursor, Codex, Windsurf, ...).
+Stdio JSON-RPC; speaks the standard `initialize` / `tools/list` / `tools/call` methods.
+
+Retrieval tools only read your graph. Tools that write local state (persona feedback, memories) say so
+in their MCP `annotations` (readOnlyHint=false); `carto mcp-server --read-only` hides them entirely.
 
 Register (Claude Code / Cursor `mcp.json`):
     { "mcpServers": { "cartograph": { "command": "carto", "args": ["mcp-server"], "type": "stdio" } } }
 """
 from __future__ import annotations
 
+import importlib
 import json
+import os
 import sys
 from typing import Any
 
 from .config import db_path, load_config
 from .storage import Store
 
+PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
+
+_STR = {"type": "string"}
+_INT = {"type": "integer"}
+_STRS = {"type": "array", "items": {"type": "string"}}
+
+
+def _obj(props: dict, required: tuple[str, ...] = ()) -> dict:
+    schema: dict[str, Any] = {"type": "object", "properties": props, "additionalProperties": False}
+    if required:
+        schema["required"] = list(required)
+    return schema
+
+
+def _d(schema: dict, description: str, **extra) -> dict:
+    return {**schema, "description": description, **extra}
+
+
 TOOLS = [
     {"name": "retrieve_context",
      "description": "BEST retrieval for injecting context: hybrid (semantic + keyword) over your whole "
                     "graph. Returns the relevant code/doc snippets (text+file+project). Use this to pull "
                     "context into a prompt.",
-     "params": {"query": "string", "top_k": "int? (default 8)"}},
+     "schema": _obj({"query": _d(_STR, "What to find."),
+                     "top_k": _d(_INT, "How many snippets (default 8).", minimum=1, maximum=50)}, ("query",))},
     {"name": "relevant_projects",
      "description": "Which of your projects/repos are most relevant to a query (hybrid ranked).",
-     "params": {"query": "string", "top_k": "int? (default 8)"}},
+     "schema": _obj({"query": _d(_STR, "What the task is about."),
+                     "top_k": _d(_INT, "How many projects (default 8).", minimum=1, maximum=50)}, ("query",))},
     {"name": "elevate_task",
      "description": "One-shot top-of-field briefing for a build task: elite bar, reference repos, the "
                     "frontier playbook (process), adjoining-field moves, and your most relevant existing repos.",
-     "params": {"task": "string", "project_path": "string?"}},
+     "schema": _obj({"task": _d(_STR, "The build task."),
+                     "project_path": _d(_STR, "Optional path of the project being built.")}, ("task",))},
     {"name": "frontier_status",
      "description": "Coverage of each field's top-tier reference repos in your graph + the prioritized "
                     "acquisition backlog.",
-     "params": {"top": "int? (default 8)"}},
+     "schema": _obj({"top": _d(_INT, "How many fields to report (default 8).", minimum=1, maximum=50)})},
     {"name": "personalize",
      "description": "THE personalization hook — call FIRST on any user prompt. Returns a steering brief "
                     "(the user's persona/field focus, output guidance, the compass constellation of "
                     "ambitions, ventures, inquiries, sparks, and sorties, and persona-ranked snippets) "
                     "to prepend so your answer fits this specific user. They hold many directions at "
                     "once; do not collapse them onto one project. Adapts as feedback accrues.",
-     "params": {"prompt": "string", "top_k": "int? (default 6)", "max_chars": "int? context budget (0=unlimited)"}},
+     "schema": _obj({"prompt": _d(_STR, "The user's request."),
+                     "top_k": _d(_INT, "How many snippets (default 6).", minimum=1, maximum=50),
+                     "max_chars": _d(_INT, "Context budget in characters (0 = unlimited).", minimum=0)},
+                    ("prompt",))},
     {"name": "constellation",
      "description": "The user's compass: slow ambitions, warm ventures and inquiries, new sparks, "
                     "temporary sorties and their residue, threads they returned to, and resting work "
                     "that is memory rather than a to-do. Pass a prompt to mark which threads it touches, "
                     "including quiet ones. Built by `carto compass --sync` from AutoLog.",
-     "params": {"prompt": "string?"}},
-    {"name": "record_use",
+     "schema": _obj({"prompt": _d(_STR, "Optional prompt to mark which threads it touches.")})},
+    {"name": "record_use", "writes": True,
      "description": "Close the learning loop: after answering, report which projects actually helped "
                     "(and which didn't) so the persona adapts to what the user responds to. Call when you "
-                    "used Cartograph context in a useful answer.",
-     "params": {"query": "string?", "helped": "string[] project names",
-                "not_helpful": "string[]? project names"}},
+                    "used Cartograph context in a useful answer. Writes local persona feedback.",
+     "schema": _obj({"query": _d(_STR, "The query the feedback is about."),
+                     "helped": _d(_STRS, "Project names that helped."),
+                     "not_helpful": _d(_STRS, "Project names that did not help.")}, ("helped",))},
     {"name": "frontier_hints",
      "description": "Reasoning hints for the task at hand: the textbook method for its technical area "
                     "(CUDA, time series, MD, signals, sparse, HPC, quant, ML), one worth-trying tangent with "
                     "when-to-try, frontier papers/repos the scout pulled for the user's active topics, and "
                     "related projects from the user's graph. Use when planning an implementation.",
-     "params": {"prompt": "string"}},
+     "schema": _obj({"prompt": _d(_STR, "The task or question.")}, ("prompt",))},
     {"name": "graph_stats",
-     "description": "Counts in your graph (projects/files/chunks/edges).", "params": {}},
+     "description": "Counts in your graph (projects/files/chunks/edges) and the semantic index state.",
+     "schema": _obj({})},
 ]
-_VALID = {t["name"] for t in TOOLS}
+_BY_NAME = {t["name"]: t for t in TOOLS}
+_VALID = set(_BY_NAME)
 
 
-def _resp(req_id: Any, result: Any = None, error: str | None = None) -> str:
+def _annotations(t: dict) -> dict:
+    writes = bool(t.get("writes"))
+    return {"title": t["name"].replace("_", " "), "readOnlyHint": not writes, "destructiveHint": False,
+            "idempotentHint": not writes, "openWorldHint": False}
+
+
+def read_only() -> bool:
+    return os.environ.get("CARTOGRAPH_MCP_READ_ONLY", "").strip().lower() in ("1", "true", "yes")
+
+
+def tool_list() -> list[dict]:
+    ro = read_only()
+    return [{"name": t["name"], "description": t["description"], "inputSchema": t["schema"],
+             "annotations": _annotations(t)} for t in TOOLS if not (ro and t.get("writes"))]
+
+
+def _resp(req_id: Any, result: Any = None, error: str | None = None, code: int = -32000) -> str:
     body: dict = {"jsonrpc": "2.0", "id": req_id}
     if error:
-        body["error"] = {"code": -32000, "message": error}
+        body["error"] = {"code": code, "message": error}
     else:
         body["result"] = result
     return json.dumps(body)
 
 
-def _params_to_schema(params: dict | None) -> dict:
-    """Shorthand `params` -> JSON-Schema `inputSchema` (MCP-spec; strict clients like Cursor require it)."""
-    props: dict[str, Any] = {}
-    required: list[str] = []
-    for name, spec in (params or {}).items():
-        s = str(spec).lower()
-        t = ("integer" if "int" in s else "number" if ("float" in s or "number" in s)
-             else "boolean" if "bool" in s else "string")
-        props[name] = {"type": t, "description": str(spec)}
-        if "?" not in s and "default" not in s:
-            required.append(name)
-    schema: dict[str, Any] = {"type": "object", "properties": props}
-    if required:
-        schema["required"] = required
-    return schema
+def _names(v) -> list[str]:
+    """Accept a list, a JSON-array string or a comma-separated string (lenient clients send all three)."""
+    if v is None:
+        return []
+    if isinstance(v, str):
+        s = v.strip()
+        if s.startswith("["):
+            try:
+                v = json.loads(s)
+            except json.JSONDecodeError:
+                v = s.strip("[]").split(",")
+        else:
+            v = s.split(",")
+    return [str(x).strip().strip('"') for x in v if str(x).strip()]
+
+
+def _negotiate(requested: Any) -> str:
+    return requested if requested in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0]
 
 
 def _handle(req: dict) -> str | None:
@@ -94,87 +145,113 @@ def _handle(req: dict) -> str | None:
 
     if method == "initialize":
         from . import __version__
-        return _resp(rid, {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}},
+        return _resp(rid, {"protocolVersion": _negotiate(params.get("protocolVersion")),
+                           "capabilities": {"tools": {"listChanged": False}},
                            "serverInfo": {"name": "cartograph", "version": __version__}})
     if isinstance(method, str) and method.startswith("notifications/"):
         return None                                       # JSON-RPC notifications get no response
+    if method == "ping":
+        return _resp(rid, {})
     if method == "tools/list":
-        tools = [{"name": t["name"], "description": t["description"],
-                  "inputSchema": _params_to_schema(t.get("params"))} for t in TOOLS]
-        return _resp(rid, {"tools": tools})
+        return _resp(rid, {"tools": tool_list()})
     if method == "tools/call":
         name = params.get("name", "")
         args = params.get("arguments", {}) or {}
         if name not in _VALID:
-            return _resp(rid, error=f"unknown tool: {name}")
-        inner = _dispatch(rid, name, args)
-        obj = json.loads(inner) if inner else {}
-        if "error" in obj:
-            return _resp(rid, error=obj["error"].get("message", "tool error"))
+            return _resp(rid, error=f"unknown tool: {name}", code=-32602)
+        if read_only() and _BY_NAME[name].get("writes"):
+            return _resp(rid, error=f"{name} writes local state; this server runs read-only", code=-32602)
+        obj = json.loads(_dispatch(rid, name, args))
+        if "error" in obj:                                # tool failures are results, not protocol errors
+            return _resp(rid, {"content": [{"type": "text", "text": obj["error"].get("message", "tool error")}],
+                               "isError": True})
         return _resp(rid, {"content": [{"type": "text", "text": json.dumps(obj.get("result"))}]})
     if method in _VALID:  # allow bare method calls too
         return _dispatch(rid, method, params)
-    return _resp(rid, error=f"unknown method: {method}")
+    return _resp(rid, error=f"unknown method: {method}", code=-32601)
 
 
 def _dispatch(rid: Any, name: str, args: dict) -> str:
-    cfg = load_config()
-    store = Store(db_path(), read_only=True)
+    """Run a tool. A long-lived server can outlive a `git pull`/reinstall of Cartograph; if an import
+    then fails on stale finder caches, invalidate them and retry once instead of failing forever."""
     try:
-        if name == "graph_stats":
-            return _resp(rid, store.stats())
-        if name in ("retrieve_context", "relevant_projects"):
-            from .retrieve import retrieve
-            res = retrieve(args.get("query", ""), store, cfg, top_k=int(args.get("top_k", 8)))
-            if name == "relevant_projects":
-                return _resp(rid, {"method": res.method, "projects": res.projects})
-            return _resp(rid, {"method": res.method, "chunks": res.chunks})
-        if name == "elevate_task":
-            from .elite import elevate
-            task = args.get("task", "")
-            if not task:
-                return _resp(rid, error="task is required")
-            return _resp(rid, elevate(task, store, cfg, project=args.get("project_path")))
-        if name == "frontier_status":
-            from .elite import frontier_report
-            return _resp(rid, frontier_report(store, top=int(args.get("top", 8))))
-        if name == "personalize":
-            from .persona import build_brief
-            from .persona.profile import load_persona
-            prompt = args.get("prompt", "")
-            if not prompt:
-                return _resp(rid, error="prompt is required")
-            return _resp(rid, build_brief(prompt, store, cfg, load_persona(store),
-                                          top_k=int(args.get("top_k", 6)),
-                                          max_chars=int(args.get("max_chars", 0))))
-        if name == "frontier_hints":
-            from .elite.methods import match_methods
-            from .scout import frontier_cards
-            prompt = args.get("prompt", "")
-            out = {"methods": match_methods(prompt), "frontier": frontier_cards(store, prompt, limit=4)}
-            try:
-                from .persona import personalized_retrieve
-                from .persona.profile import load_persona
-                out["related"] = personalized_retrieve(prompt, store, cfg, load_persona(store), top_k=6).get("related", [])
-            except Exception:
-                out["related"] = []
-            return _resp(rid, out)
-        if name == "constellation":
-            from .compass import compass_for_prompt
-            return _resp(rid, compass_for_prompt(store, args.get("prompt") or ""))
-        if name == "record_use":
-            from .persona import record_feedback
-            from .persona.profile import load_persona
-            p = record_feedback(load_persona(store), store, cfg, query=args.get("query", ""),
-                                liked_projects=list(args.get("helped", []) or []),
-                                disliked_projects=list(args.get("not_helpful", []) or []))
-            return _resp(rid, {"ok": True, "n_signals": p.n_signals, "persona": p.summary()})
+        return _run(rid, name, args)
+    except ImportError:
+        importlib.invalidate_caches()
+        for mod in [m for m in sys.modules if m.startswith("cartograph.") and sys.modules[m] is None]:
+            del sys.modules[mod]
+        try:
+            return _run(rid, name, args)
+        except Exception as e:  # noqa: BLE001 - never hang the client
+            return _resp(rid, error=f"{name} failed: {e}")
     except Exception as e:  # noqa: BLE001 - never hang the client
         return _resp(rid, error=f"{name} failed: {e}")
+
+
+def _run(rid: Any, name: str, args: dict) -> str:
+    if not db_path().exists():
+        return _resp(rid, error="No Cartograph graph yet. Run `carto init` and `carto ingest` first.")
+    cfg = load_config()
+    store = Store(db_path(), read_only=True)
+    if name == "graph_stats":
+        from .embed import index_status
+        st = index_status()
+        return _resp(rid, {**store.stats(), "index": {k: st.get(k) for k in ("state", "done", "total", "running")}})
+    if name in ("retrieve_context", "relevant_projects"):
+        from .retrieve import retrieve
+        query = args.get("query", "")
+        if not query:
+            return _resp(rid, error="query is required")
+        res = retrieve(query, store, cfg, top_k=int(args.get("top_k", 8)))
+        if name == "relevant_projects":
+            return _resp(rid, {"method": res.method, "projects": res.projects})
+        return _resp(rid, {"method": res.method, "chunks": res.chunks})
+    if name == "elevate_task":
+        from .elite import elevate
+        task = args.get("task", "")
+        if not task:
+            return _resp(rid, error="task is required")
+        return _resp(rid, elevate(task, store, cfg, project=args.get("project_path")))
+    if name == "frontier_status":
+        from .elite import frontier_report
+        return _resp(rid, frontier_report(store, top=int(args.get("top", 8))))
+    if name == "personalize":
+        from .persona import build_brief
+        from .persona.profile import load_persona
+        prompt = args.get("prompt", "")
+        if not prompt:
+            return _resp(rid, error="prompt is required")
+        return _resp(rid, build_brief(prompt, store, cfg, load_persona(store),
+                                      top_k=int(args.get("top_k", 6)),
+                                      max_chars=int(args.get("max_chars", 0))))
+    if name == "frontier_hints":
+        from .elite.methods import match_methods
+        from .scout import frontier_cards
+        prompt = args.get("prompt", "")
+        out = {"methods": match_methods(prompt), "frontier": frontier_cards(store, prompt, limit=4)}
+        try:
+            from .persona import personalized_retrieve
+            from .persona.profile import load_persona
+            out["related"] = personalized_retrieve(prompt, store, cfg, load_persona(store), top_k=6).get("related", [])
+        except Exception:
+            out["related"] = []
+        return _resp(rid, out)
+    if name == "constellation":
+        from .compass import compass_for_prompt
+        return _resp(rid, compass_for_prompt(store, args.get("prompt") or ""))
+    if name == "record_use":
+        from .persona import record_feedback
+        from .persona.profile import load_persona
+        p = record_feedback(load_persona(store), store, cfg, query=args.get("query", ""),
+                            liked_projects=_names(args.get("helped")),
+                            disliked_projects=_names(args.get("not_helpful")))
+        return _resp(rid, {"ok": True, "n_signals": p.n_signals, "persona": p.summary()})
     return _resp(rid, error=f"unhandled: {name}")
 
 
-def serve() -> None:
+def serve(read_only_mode: bool = False) -> None:
+    if read_only_mode:
+        os.environ["CARTOGRAPH_MCP_READ_ONLY"] = "1"
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -182,6 +259,8 @@ def serve() -> None:
         try:
             req = json.loads(line)
         except json.JSONDecodeError:
+            sys.stdout.write(_resp(None, error="parse error", code=-32700) + "\n")
+            sys.stdout.flush()
             continue
         is_notification = "id" not in req                 # JSON-RPC notifications get no response
         out = _handle(req)
@@ -191,4 +270,4 @@ def serve() -> None:
 
 
 if __name__ == "__main__":
-    serve()
+    serve("--read-only" in sys.argv)
