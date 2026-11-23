@@ -31,6 +31,17 @@ All notable changes to Cartograph (`cartograph__v1`) are documented here. Versio
 - Office lock files (`~$x.docx`) are skipped; `carto ingest` reports how many PDFs were skipped for lack
   of a PDF reader.
 
+### A graph with provenance (no LLM)
+- **Deterministic entities and relations**: dependencies declared in manifests (requirements, pyproject,
+  package.json, Cargo.toml, go.mod, environment.yml), Python/JS/TS imports, papers by DOI and arXiv id,
+  GitHub repos, Hugging Face models and datasets.
+- Every fact records its **evidence chunk** (citable), **extractor**, **confidence** and **first/last seen**;
+  a file edit keeps first_seen for facts it still states and drops the ones it no longer does.
+- **Projects linked through shared entities**, weighted by rarity (sharing a paper beats sharing numpy),
+  with the shared entities listed on the edge.
+- `carto entities PROJECT`, `carto entities --find pydantic`, `carto entities --backfill` (one pass over an
+  existing graph; 6.5M chunks took ~15 min), and an `entities` MCP tool.
+
 ### Change detection
 - Files are hashed in full (v1 hashed only the first 1 MB, so edits past it went unnoticed). Files up to
   1 MB keep their v1 hash, so upgrading re-chunks only the 1–2 MB files that could have been stale.
