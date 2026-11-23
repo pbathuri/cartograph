@@ -196,7 +196,7 @@ def _svg(w: int, h: int, defs: str, body: str) -> str:
 
 def badge_svg() -> str:
     d, b = moley()
-    return _svg(256, 256, d, f'<title>Moley, your local guide</title>{b}')
+    return _svg(256, 256, d, f'<title>Moley, Your Local Guide</title>{b}')
 
 
 def favicon_svg() -> str:
@@ -237,8 +237,8 @@ def banner_svg(title: Font, text: Font) -> str:
             + f'<g transform="translate(56 52)">{mb}</g>'
             + title.path("Cartograph", 118, 352, 178, TEXT, tracking=-1.5)
             + text.path(tag, 38, 358, 240, GOLD)
-            + text.path("Moley \u00b7 your local guide", 26, 360, 292, TEAL, tracking=.6))
-    return _svg(W, H, bd + md, '<title>Cartograph \u2014 Moley, your local guide</title>' + body)
+            + text.path("Moley \u00b7 Your Local Guide", 26, 360, 292, TEAL, tracking=.6))
+    return _svg(W, H, bd + md, '<title>Cartograph \u2014 Moley, Your Local Guide</title>' + body)
 
 
 def social_svg(title: Font, text: Font, mono: Font) -> str:
@@ -256,7 +256,7 @@ def social_svg(title: Font, text: Font, mono: Font) -> str:
     pts = [(700, 70), (770, 40), (820, 110), (900, 60), (740, 560), (820, 600), (880, 540)]
     parts = [bb, _graph(pts, [(0, 1), (1, 2), (2, 3), (1, 3), (4, 5), (5, 6)], .18),
              f'<g transform="translate(790 92) scale(1.66)">{mb}</g>',
-             text.path("Moley \u00b7 your local guide", 26, 1002, 562, TEAL, tracking=.6, anchor="middle"),
+             text.path("Moley \u00b7 Your Local Guide", 26, 1002, 562, TEAL, tracking=.6, anchor="middle"),
              title.path("Cartograph", 108, x - 4, 196, TEXT, tracking=-1.5),
              text.path("Your files, cited.", 46, x, 268, GOLD),
              text.path("Your agents, remembering.", 46, x, 324, GOLD)]

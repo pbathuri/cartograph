@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/banner.svg" alt="Cartograph, with Moley, your local guide: your files, cited. Your agents, remembering." width="100%"/>
+<img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/banner.svg" alt="Cartograph, with Moley, Your Local Guide: your files, cited. Your agents, remembering." width="100%"/>
 
 **A local knowledge graph and shared memory for every AI agent you use.**
 Point it at your folders: PDFs, Word, slides, spreadsheets, notebooks, notes and code become one graph
@@ -38,8 +38,8 @@ Cartograph is the boring, dependable version:
   valid until they are superseded, and get flagged when the files they point at change.
 
 <table><tr>
-<td width="140"><img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/moley.svg" width="128" alt="Moley, your local guide"/></td>
-<td>Meet <b>Moley, your local guide</b>. Named for the mole in <i>The Wind in the Willows</i> who catches
+<td width="140"><img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/moley.svg" width="128" alt="Moley, Your Local Guide"/></td>
+<td>Meet <b>Moley, Your Local Guide</b>. Named for the mole in <i>The Wind in the Willows</i> who catches
 the scent of a home he'd forgotten and finds his way back to it, he carries a brass lantern through
 your files so your agents don't have to dig, and it only lights up what there's evidence for.
 Local, because he never leaves your machine.</td>

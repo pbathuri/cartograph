@@ -6,7 +6,7 @@
 <linearGradient id="mrim" x1="1" y1="0" x2=".3" y2="0"><stop offset="0" stop-color="#ffcf6e" stop-opacity=".5"/><stop offset="1" stop-color="#ffcf6e" stop-opacity="0"/></linearGradient>
 <linearGradient id="mbrass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffdc7f"/><stop offset=".55" stop-color="#d9a13a"/><stop offset="1" stop-color="#9c6a22"/></linearGradient>
 <radialGradient id="mglass" cx="50%" cy="58%" r="70%"><stop offset="0" stop-color="#fff6d2"/><stop offset="1" stop-color="#ffc964"/></radialGradient>
-<radialGradient id="mflame" cx="50%" cy="68%" r="62%"><stop offset="0" stop-color="#fffbe8"/><stop offset=".45" stop-color="#ffd25a"/><stop offset="1" stop-color="#ff8a3d"/></radialGradient></defs><title>Moley, your local guide</title>
+<radialGradient id="mflame" cx="50%" cy="68%" r="62%"><stop offset="0" stop-color="#fffbe8"/><stop offset=".45" stop-color="#ffd25a"/><stop offset="1" stop-color="#ff8a3d"/></radialGradient></defs><title>Moley, Your Local Guide</title>
 <circle cx="128" cy="128" r="123" fill="#0b1020"/>
 <circle cx="128" cy="128" r="116" fill="url(#mbg)"/>
 <g clip-path="url(#mc)">
