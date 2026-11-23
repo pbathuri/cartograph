@@ -2,7 +2,9 @@
 
 All notable changes to Cartograph (`cartograph__v1`) are documented here. Versioning is semantic.
 
-## [Unreleased] — 2.0 series
+## [2.0.0] — 2026-11-23
+Documents with citations, a graph with provenance, memory every agent shares, and an Atlas to see it.
+No LLM is needed to build any of it.
 
 ### Index you can trust on a big corpus
 - **Resumable builds.** A killed `carto index` continues from the rows it already wrote instead of
@@ -80,6 +82,30 @@ All notable changes to Cartograph (`cartograph__v1`) are documented here. Versio
     known pages, sections, slides and lines; scores whether the top result is the right file *and* the
     citation points at the right place.
 - Results are kept per day in `~/.cartograph/bench/results-<date>.json`.
+
+### Plugs into everything
+- **`carto connect`** registers the MCP server with Claude Code, Claude Desktop, Cursor, Windsurf, VS Code,
+  Cline, Gemini CLI, Codex, Zed, Continue and LM Studio (Goose: printed snippet). It backs up each file,
+  is idempotent, and is reversible with `--remove`. Files with comments are never rewritten; the snippet is
+  printed instead. With no arguments it shows which clients are installed and connected. The server is
+  launched with the installing interpreter, so GUI apps without conda or venv on PATH still find it.
+- `carto agent-setup` prints the same robust config.
+
+### The Atlas (`carto viz`)
+- Rebuilt as an offline canvas map (no CDN): a **headlamp** that lights the map around the cursor, search
+  that makes matching projects glow and pulse, results with click-to-copy **citation chips**, a
+  **project panel** (dependencies, citations and references with evidence; linked projects and the shared
+  entities behind each link; memories), and a **memory timeline** with superseded entries struck through.
+- Entity hubs (papers, repos, models, datasets shared by several projects) are drawn as diamonds.
+- The map payload is cached until the graph file changes: the first load on a 6.5M-chunk graph takes
+  seconds, later loads 10 ms. If the port is busy, the server moves to the next free one.
+- Meet Digby, the mole, on the map, in the README and on the social card.
+
+### Faster and cleaner
+- Keyword-only search no longer imports PyTorch to find out whether semantic search is installed. The first
+  query without an index went from ~10 s to 30 ms, which also speeds up MCP server cold starts.
+- Interpreters and tooling (`python`, `pip`, `setuptools`, `ipykernel`, ...) are no longer graph entities
+  or reasons to link two projects.
 
 ### Change detection
 - Files are hashed in full (v1 hashed only the first 1 MB, so edits past it went unnoticed). Files up to

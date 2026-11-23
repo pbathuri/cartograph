@@ -5,18 +5,28 @@ build-backend = "setuptools.build_meta"
 [project]
 # PyPI distribution name (the import module stays `cartograph` and the CLI stays `carto`).
 name = "cartograph__v1"
-version = "1.0.1"
-description = "Build a personal cognitive graph of everything you work with, and plug it into your AI agents."
+version = "2.0.0"
+description = "Local knowledge graph + shared memory for AI agents: PDFs, Office, notebooks and code with page/line citations, over MCP."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [{ name = "Cartograph contributors" }]
-keywords = ["rag", "knowledge-graph", "retrieval", "mcp", "ai-agents", "embeddings", "local-first"]
+keywords = ["rag", "knowledge-graph", "graphrag", "retrieval", "mcp", "mcp-server", "ai-agents", "agent-memory", "memory",
+            "embeddings", "local-first", "citations", "pdf", "claude", "cursor", "codex", "second-brain"]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Indexing",
 ]
 
 # Core deps are intentionally tiny: a fully-working graph + FTS + viz + MCP with ZERO heavy ML.
@@ -50,6 +60,8 @@ carto = "cartograph.cli:app"
 [project.urls]
 Homepage = "https://github.com/pbathuri/cartograph"
 Documentation = "https://github.com/pbathuri/cartograph#readme"
+Changelog = "https://github.com/pbathuri/cartograph/blob/main/CHANGELOG.md"
+Issues = "https://github.com/pbathuri/cartograph/issues"
 
 [tool.ruff]
 line-length = 120
@@ -65,4 +77,4 @@ per-file-ignores = { "cartograph/cli.py" = ["E402"] }
 include = ["cartograph*"]
 
 [tool.setuptools.package-data]
-"cartograph.viz" = ["*.html"]
+"cartograph.viz" = ["*.html", "*.png"]

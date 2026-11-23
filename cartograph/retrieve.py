@@ -57,7 +57,7 @@ _INDEX = None
 def _semantic_chunk_ids(cfg: Config, query: str, top_k: int) -> list[int]:
     global _INDEX
     from .embed import SemanticIndex
-    if not (available_semantic() and SemanticIndex.exists()):
+    if not (SemanticIndex.exists() and available_semantic()):
         return []
     try:
         if _INDEX is None or _INDEX.signature != SemanticIndex.current_signature():

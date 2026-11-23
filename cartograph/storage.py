@@ -3,6 +3,7 @@ Local-first, zero servers. The same design that scaled to >1M chunks in the engi
 distilled from — but with a clean, dependency-free schema anyone can inspect."""
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -294,9 +295,17 @@ class Store:
                 nodes.append({"id": f"p{d['id']}", "label": d["name"], "field": d["field"] or "",
                               "size": min(40, 8 + (d["nf"] or 0) // 5), "kind": "project"})
             pid = {n["id"] for n in nodes}
-            for r in c.execute("SELECT src_id, relation, dst_id FROM edges WHERE relation IN "
+            for r in c.execute("SELECT src_id, relation, dst_id, metadata FROM edges WHERE relation IN "
                                "('PROJECT_RELATED_TO_PROJECT', 'PROJECT_SHARES_ENTITY') LIMIT 4000").fetchall():
                 s, d = f"p{r['src_id']}", f"p{r['dst_id']}"
                 if s in pid and d in pid:
-                    edges.append({"source": s, "target": d, "relation": r["relation"]})
+                    try:
+                        meta = json.loads(r["metadata"] or "{}")
+                    except ValueError:
+                        meta = {}
+                    e = {"source": s, "target": d, "relation": r["relation"],
+                         "weight": float(meta.get("score") or meta.get("weight") or 1.0)}
+                    if meta.get("via"):
+                        e["via"] = meta["via"][:5]
+                    edges.append(e)
         return {"nodes": nodes, "edges": edges}
