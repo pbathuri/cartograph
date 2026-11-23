@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 # PyPI distribution name (the import module stays `cartograph` and the CLI stays `carto`).
 name = "cartograph__v1"
-version = "2.0.1"
+version = "2.0.2"
 description = "Local knowledge graph + shared memory for AI agents: PDFs, Office, notebooks and code with page/line citations, over MCP."
 readme = "README.md"
 license = { text = "MIT" }
@@ -56,6 +56,8 @@ dev = ["pytest>=7", "numpy>=1.24", "ruff>=0.6", "pypdf>=4.0"]  # numpy: learned-
 
 [project.scripts]
 carto = "cartograph.cli:app"
+# Same CLI under the PyPI name, so `uvx cartograph__v1 mcp-server` (how MCP Registry clients launch it) resolves.
+cartograph__v1 = "cartograph.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/pbathuri/cartograph"

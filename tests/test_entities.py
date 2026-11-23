@@ -62,6 +62,8 @@ def test_identifiers():
     assert names(f, "REFERENCES") == {"github/huggingface/transformers"}
     assert names(f, "USES_MODEL") == {"hf/meta-llama/llama-3-8b"}
     assert names(f, "USES_DATASET") == {"hf/squad/v2"}
+    end = E.extract("We start from huggingface.co/retina-lab/unet-vessels. It works.", "notes.md")
+    assert names(end, "USES_MODEL") == {"hf/retina-lab/unet-vessels"}
 
 
 def _proj(tmp_path, name, files):

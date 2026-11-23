@@ -1,10 +1,14 @@
+<!-- mcp-name: io.github.pbathuri/cartograph -->
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/banner.svg" alt="Cartograph, with Moley, Your Local Guide: your files, cited. Your agents, remembering." width="100%"/>
 
-**A local knowledge graph and shared memory for every AI agent you use.**
-Point it at your folders: PDFs, Word, slides, spreadsheets, notebooks, notes and code become one graph
-your agents query over MCP, and every answer comes back with the page, slide or line it came from.
+### Your AI agents can read your papers, docs and code, and cite the page.
+
+Cartograph turns your folders (PDFs, Word, slides, spreadsheets, notebooks, notes and repos) into one
+local index that Claude Code, Cursor, Codex and nine other AI clients search over MCP. Every answer says
+where it came from (`paper.pdf p.12`, `deck.pptx slide 3`, `train.py:L40-88`), and every agent shares one
+memory of what you decided.
 
 [![CI](https://github.com/pbathuri/cartograph/actions/workflows/ci.yml/badge.svg)](https://github.com/pbathuri/cartograph/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/cartograph__v1?color=ffd166&label=pypi)](https://pypi.org/project/cartograph__v1/)
@@ -12,30 +16,39 @@ your agents query over MCP, and every answer comes back with the page, slide or 
 [![License: MIT](https://img.shields.io/badge/license-MIT-3fb8af)](LICENSE)
 ![Local-first](https://img.shields.io/badge/data-stays%20on%20your%20machine-7ee787)
 
-[Quickstart](#quickstart) · [What you get](#what-you-get) · [Works with](#works-with) ·
+`pip install "cartograph__v1[docs]"` · nothing leaves your machine · no LLM needed to build it
+
+[Quickstart](#quickstart) · [Why not grep?](#why-not-claudemd-built-in-memory-or-grep) · [Works with](#works-with) ·
 [Benchmarks](#benchmarks) · [Compared](#how-it-compares) · [Use cases](#use-cases) · [Atlas](#the-atlas)
 
 </div>
 
----
+<img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/demo.svg" alt="carto demo: a question answered with citations to a Word section, a slide and a notebook cell; two projects linked because they cite the same paper; a decision saved to memory and flagged stale when its file changes" width="100%"/>
 
-## Why
+<sub>That's <code>carto demo</code>: a synthetic lab, start to finish, in under a second. Try it right after installing.</sub>
 
-Agents forget. Every new session in Claude Code, Cursor or Codex starts from zero: it doesn't know
-your papers, your repos, what you decided last week or which approach you already ruled out. The
-usual fixes have a catch. They send your documents to an LLM to build the graph (slow and costly at
-scale, and your data leaves the machine), they need a database server, or they answer without saying
-where the answer came from.
+## Why Cartograph
 
-Cartograph is the boring, dependable version:
+- **Cited, not guessed.** In our benchmark the top result cites the exact page, slide or line 99.2% of
+  the time, so your agent can quote `paper.pdf p.12` and you can check it.
+- **All your files, not just code.** PDF, Word, PowerPoint, Excel, EPUB, notebooks, LaTeX, BibTeX and 70
+  code, data and config formats. Run daily on a 535,000-file, 6.5-million-chunk library.
+- **One memory for every agent.** A decision saved in Claude Code is there in Cursor's next session.
+  When the files a memory points at change, it's flagged as possibly stale.
+- **Local and light.** One SQLite file, a 43 MB install, no LLM calls to index, no server, no account.
+- **Plugs into 12 AI clients with one command:** `carto connect all`.
 
-- **No LLM needed to build the graph.** Parsing, chunking, entity extraction and linking are
-  deterministic. Bring any model you like to *use* it.
-- **One SQLite file** in `~/.cartograph`. No Docker, no Neo4j, no vector DB, no account.
-- **Every result is citable**: `paper.pdf p.12`, `deck.pptx slide 3`, `train.py:L40-88`,
-  `doses.xlsx sheet Doses`, `thesis.docx § Methods`.
-- **One memory shared by all your agents.** Decisions, rejected approaches and preferences stay
-  valid until they are superseded, and get flagged when the files they point at change.
+## Why not CLAUDE.md, built-in memory, or grep?
+
+- **CLAUDE.md, AGENTS.md and Claude's auto memory** are great for instructions and a few dozen notes,
+  for one repo in one client. Cartograph is for what doesn't fit there: thousands of PDFs and Office
+  files across many projects, searched with citations, and shared by every client. Use both.
+- **grep** can't read PDFs, Word or slides, doesn't rank, and has no budget. Across hundreds of thousands
+  of files an agent spends its context just finding one thing. `retrieve_context` returns ranked, cited
+  passages under a hard `max_tokens` cap. Keyword search answers in 30 to 230 ms on a 6.5-million-chunk
+  library.
+- **Do I need a GPU, an API key or Docker?** No. Keyword search works the moment `carto ingest`
+  finishes. Semantic search is optional and runs locally.
 
 <table><tr>
 <td width="140"><img src="https://raw.githubusercontent.com/pbathuri/cartograph/main/docs/assets/moley.svg" width="128" alt="Moley, Your Local Guide"/></td>
@@ -49,6 +62,7 @@ Local, because he never leaves your machine.</td>
 
 ```bash
 pip install "cartograph__v1[docs]"     # core + PDF support. Command: carto. Import: cartograph
+carto demo                             # one second, on a synthetic lab; your files untouched
 carto ingest ~/research ~/code         # incremental: re-run anytime, only changed files are re-read
 carto connect all                      # register the MCP server with every AI client it finds
 carto viz                              # the Atlas: explore the map, search with citations
@@ -138,6 +152,7 @@ trade-offs. This summary is based on each project's own docs at the time of writ
 | | Graph built without an LLM | Runs with no servers | Main focus |
 |---|---|---|---|
 | **Cartograph** | yes | yes (one SQLite file) | your files plus agent memory, with citations |
+| Claude Code auto memory | n/a (notes, no graph) | yes (Markdown files) | notes Claude keeps per repo, in Claude Code |
 | Mem0 / OpenMemory | no (LLM extracts memories) | optional | chat and agent memory |
 | Graphiti (Zep) | no | no (Neo4j or FalkorDB) | temporal knowledge graph of conversations |
 | Cognee | no | yes (embedded defaults) | LLM-built knowledge graphs from data |
@@ -206,6 +221,16 @@ An interactive map of your graph that works offline: no CDN, no tracking.
 - **Safe config edits.** `connect` and `hooks` back up every file they touch, are idempotent, and
   can be undone (`--remove`, `hooks uninstall`).
 
+## Limits
+
+- The graph is built from structure, not from an LLM reading your prose: dependencies, imports, papers
+  (DOI, arXiv), repos, models, datasets and the links they imply. If you need open-ended relations
+  extracted from text, an LLM-built graph (GraphRAG, Graphiti, Cognee) does that, at a cost.
+- Scanned PDFs need OCR: install PyMuPDF and Tesseract and set `ocr: true`.
+- Embedding millions of chunks takes hours on a laptop. Keyword search works immediately, and you can
+  search while the semantic index builds.
+- It's a context layer, not a chat app. Bring your own agent or model.
+
 ## Install options
 
 | Install | Adds |
@@ -230,7 +255,10 @@ Run `carto <command> --help` for details. Changes are in [CHANGELOG.md](CHANGELO
 
 ## Privacy
 
-Everything lives in `~/.cartograph` (or `CARTOGRAPH_HOME`). Nothing is uploaded, and there is no telemetry.
+Everything lives in `~/.cartograph` (or `CARTOGRAPH_HOME`). Your files are never uploaded, and there is
+no telemetry. The network is used only when you ask for it: downloading the embedding model for
+`[semantic]`, downloading SciFact for `carto bench`, and `carto scout` (also run by `carto improve`),
+which sends topic keywords, never file contents, to the arXiv and GitHub search APIs.
 The local web server binds to loopback, checks the Host header against DNS rebinding, and requires a
 token for anything that writes.
 

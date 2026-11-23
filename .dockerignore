@@ -1,0 +1,8 @@
+.git
+.github
+**/__pycache__
+*.egg-info
+build
+dist
+.venv
+docs/assets/*.png

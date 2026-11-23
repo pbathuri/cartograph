@@ -9,7 +9,9 @@ Google Fonts: Outfit and Source Code Pro, both SIL Open Font License.
 
 from __future__ import annotations
 
+import math
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -271,6 +273,24 @@ def social_svg(title: Font, text: Font, mono: Font) -> str:
                 + "".join(parts))
 
 
+def demo_svg() -> str:
+    """`carto demo` as a terminal screenshot. HOME points at an empty folder so no real clients are listed."""
+    from rich.console import Console
+
+    from cartograph.demo import run_demo
+    old = os.environ.get("HOME")
+    with tempfile.TemporaryDirectory() as fake_home:
+        os.environ["HOME"] = fake_home
+        try:
+            con = Console(record=True, width=112, force_terminal=True, color_system="truecolor", _environ={})
+            con.print("[bold]$ carto demo[/bold]")
+            con.print("[bold]Cartograph demo[/bold] — a small synthetic lab, in a throwaway workspace.")
+            run_demo(con)
+        finally:
+            os.environ["HOME"] = old or ""
+    return con.export_svg(title="carto demo")
+
+
 def _chrome() -> str:
     for c in (os.environ.get("CHROME"), "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
               "/Applications/Chromium.app/Contents/MacOS/Chromium",
@@ -308,7 +328,8 @@ def main() -> None:
     mono = Font(_fetch(MONO), 500)
     ASSETS.mkdir(parents=True, exist_ok=True)
     files = {ASSETS / "moley.svg": badge_svg(), VIZ / "moley.svg": badge_svg(), VIZ / "favicon.svg": favicon_svg(),
-             ASSETS / "banner.svg": banner_svg(title, text), ASSETS / "social.svg": social_svg(title, text, mono)}
+             ASSETS / "banner.svg": banner_svg(title, text), ASSETS / "social.svg": social_svg(title, text, mono),
+             ASSETS / "demo.svg": demo_svg()}
     for p, s in files.items():
         p.write_text(s, encoding="utf-8")
 
@@ -318,7 +339,11 @@ def main() -> None:
     render(VIZ / "favicon.svg", 256, 256).resize((64, 64), Image.LANCZOS).save(VIZ / "favicon.png", optimize=True)
     social = render(ASSETS / "social.svg", 1280, 640).resize((1280, 640), Image.LANCZOS).convert("RGB")
     social.save(ASSETS / "social.png", optimize=True)
-    for p in [*files, ASSETS / "mascot.png", VIZ / "mascot.png", VIZ / "favicon.png", ASSETS / "social.png"]:
+    vb = re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', files[ASSETS / "demo.svg"])
+    w, h = (math.ceil(float(v)) for v in vb.groups())
+    render(ASSETS / "demo.svg", w, h).convert("RGB").save(ASSETS / "demo.png", optimize=True)
+    for p in [*files, ASSETS / "mascot.png", VIZ / "mascot.png", VIZ / "favicon.png", ASSETS / "social.png",
+              ASSETS / "demo.png"]:
         print(f"{p.relative_to(ROOT)}  {p.stat().st_size // 1024} KB")
 
 

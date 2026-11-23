@@ -190,9 +190,10 @@ def extract(text: str, path: str = "", local: frozenset[str] = frozenset()) -> l
     if "huggingface.co/" in text:
         for m in _HF.finditer(text):
             kind = "dataset" if m.group(1) else "model"
-            if not m.group(2).lower().startswith(("docs/", "spaces/", "blog/", "papers/", "learn/")):
+            name = m.group(2).rstrip(".-").lower()            # "…/unet-vessels." at the end of a sentence
+            if "/" in name and not name.startswith(("docs/", "spaces/", "blog/", "papers/", "learn/")):
                 rel = "USES_DATASET" if kind == "dataset" else "USES_MODEL"
-                out.append((kind, "hf/" + m.group(2).lower(), rel, 0.85, "identifiers"))
+                out.append((kind, "hf/" + name, rel, 0.85, "identifiers"))
     return out
 
 

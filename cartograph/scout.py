@@ -7,7 +7,7 @@ two weeks. Messaging, video and personal threads never become search terms. For 
   1. queries the arXiv API (relevance-sorted) and GitHub repository search (stars, recently pushed),
   2. writes one small Markdown card per result into ~/.cartograph/frontier/<topic>/ (title, authors, date,
      abstract/description, link, which of your topics it matched),
-  3. optionally downloads the top arXiv PDFs to an archive folder (the Optometry drive when mounted),
+  3. optionally downloads the top arXiv PDFs to an archive folder (`pdf_dir`, e.g. an external drive),
   4. leaves ingestion to the caller, so cards become searchable context and `frontier_hints` material.
 
 Network access happens only here (an explicit `carto scout` / nightly `carto improve`), never while an
