@@ -2,6 +2,18 @@
 
 All notable changes to Cartograph (`cartograph__v1`) are documented here. Versioning is semantic.
 
+## [Unreleased]
+
+- **Index builds can no longer destroy each other.** A second builder (e.g. the nightly `carto improve`
+  starting while `carto index` runs) used to delete the first one's folder and start over, while the
+  first kept writing into the deleted file. Builds now take a single-builder lock; `improve` skips its
+  index step while a build is running, and `carto index` says so.
+- **Resume survives graph changes.** If chunks were added or changed since an unfinished build began, its
+  finished rows are carried over by chunk id instead of thrown away; only new chunks are embedded.
+- `improve` logs why a step failed and writes `reports/latest.json` after every step, so a killed run
+  still leaves a record.
+- Apple-GPU builds use batch 128 (about 10% faster than 64 on an M-series Mac).
+
 ## [2.0.2] — 2026-11-23
 
 - **Listed in the official MCP Registry** as `io.github.pbathuri/cartograph` (`server.json`; the release

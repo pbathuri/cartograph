@@ -52,7 +52,9 @@ def run(*, do_ingest: bool = True, do_scout: bool = True, do_index: bool = True,
         except Exception as e:  # keep going; the report shows what broke
             rep["steps"][name] = {"ok": False, "seconds": round(time.time() - t0, 1), "error": repr(e),
                                   "trace": traceback.format_exc()[-1200:]}
-        log(f"{name}: {'ok' if rep['steps'][name]['ok'] else 'FAILED'}")
+        s = rep["steps"][name]
+        log(f"{name}: ok" if s["ok"] else f"{name}: FAILED: {s['error']}")
+        _write_latest(rep)                                    # a run killed mid-way still leaves a record
 
     def ingest_all():
         from pathlib import Path as _P
@@ -89,10 +91,13 @@ def run(*, do_ingest: bool = True, do_scout: bool = True, do_index: bool = True,
         step("ingest_frontier", _ingest_frontier)
     if do_index:
         def _index():
-            from .embed import available, build_index
+            from .embed import BuildRunning, available, build_index
             if not available():
                 return {"skipped": "semantic extra not installed"}
-            return build_index(store, cfg)
+            try:
+                return build_index(store, cfg)
+            except BuildRunning as e:
+                return {"skipped": f"{e}; it will pick up today's new chunks next run"}
         step("index", _index)
 
     def _graph():
@@ -117,12 +122,16 @@ def run(*, do_ingest: bool = True, do_scout: bool = True, do_index: bool = True,
     step("eval_tune", _eval)
 
     rep["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-    _reports_dir().mkdir(parents=True, exist_ok=True)
     path = _reports_dir() / f"{time.strftime('%Y-%m-%d')}.md"
+    _write_latest(rep)
     path.write_text(render(rep), encoding="utf-8")
-    (_reports_dir() / "latest.json").write_text(json.dumps(rep, indent=2, default=str))
     rep["report"] = str(path)
     return rep
+
+
+def _write_latest(rep: dict) -> None:
+    _reports_dir().mkdir(parents=True, exist_ok=True)
+    (_reports_dir() / "latest.json").write_text(json.dumps(rep, indent=2, default=str))
 
 
 def render(rep: dict) -> str:

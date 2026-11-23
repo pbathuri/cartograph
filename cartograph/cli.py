@@ -199,8 +199,13 @@ def index(full: bool = typer.Option(False, "--full", help="Re-embed every chunk 
         return
     cfg = load_config()
     console.print("[bold]building semantic index[/bold] (first run downloads the model) …")
-    res = build_index(_store(read_only=True), cfg, full=full,
-                      progress=lambda m: console.print(f"  {m}", style="dim"))
+    from .embed import BuildRunning
+    try:
+        res = build_index(_store(read_only=True), cfg, full=full,
+                          progress=lambda m: console.print(f"  {m}", style="dim"))
+    except BuildRunning as e:
+        console.print(f"[yellow]{e}[/yellow]. Watch it with [bold]carto index --status --watch[/bold].")
+        raise typer.Exit(1) from None
     console.print(f"[green]✓ indexed[/green] {res.get('vectors', 0)} chunks "
                   f"({res.get('embedded', 0)} embedded, {res.get('reused', 0)} reused, "
                   f"{res.get('resumed', 0)} resumed) -> {res.get('dir', index_dir())}")
