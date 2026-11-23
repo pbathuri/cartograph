@@ -1,0 +1,31 @@
+README.md
+  s_9597705f0f5f64::t_e0935022c17161 3,41-42
+cartograph/viz/index.html
+  s_9597705f0f5f64::t_91bfdf3909d1a8 83
+cartograph/viz/moley.svg
+  s_9597705f0f5f64::t_da143d73e1892c 9
+docs/assets/banner.svg
+  s_9597705f0f5f64::t_8f792da7d7c53b 9,66
+docs/assets/moley.svg
+  s_9597705f0f5f64::t_ca2f1a670452f3 9
+docs/assets/social.svg
+  s_9597705f0f5f64::t_706a69ae447687 66
+scripts/brand.py
+  s_9597705f0f5f64::t_1ce0bd9af7ce58 199,240-241,259
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "920e52f1657e017efddf60a9a7b307165f40904f",
+  "prompts": {},
+  "sessions": {
+    "s_9597705f0f5f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0b658c7a-6ac9-46ac-a4fd-2f187e8a489a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "pbathuri <taaffeite.aart@gmail.com>"
+    }
+  }
+}
