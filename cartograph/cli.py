@@ -137,7 +137,7 @@ def ingest(
         n = store.prune_outside(all_roots, keep_names={_SCREEN})
         if n:
             console.print(f"[dim]removed {n} project(s) outside your configured roots[/dim]")
-    total = {"projects": 0, "files_indexed": 0, "chunks": 0, "docs": 0, "docs_unsupported": 0}
+    total = {"projects": 0, "files_indexed": 0, "chunks": 0, "docs": 0, "docs_unsupported": 0, "files_pruned": 0}
     fields: dict = {}
     for t in targets:
         console.print(f"[bold]ingesting[/bold] {t} …")
@@ -148,6 +148,8 @@ def ingest(
             fields[k] = fields.get(k, 0) + v
     console.print(f"\n[green]✓ ingested[/green] {total['projects']} projects · "
                   f"{total['files_indexed']} files ({total['docs']} documents) · {total['chunks']} chunks")
+    if total["files_pruned"]:
+        console.print(f"  [dim]removed {total['files_pruned']} file(s) that were deleted or moved to another project[/dim]")
     if total["docs_unsupported"]:
         console.print(f"  [yellow]{total['docs_unsupported']} PDFs skipped[/yellow] — no PDF reader installed: "
                       "[bold]pip install \"cartograph__v1[docs]\"[/bold]")

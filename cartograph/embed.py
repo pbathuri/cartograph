@@ -19,6 +19,7 @@ from .storage import Store
 
 DOC_PREFIX = "search_document: "
 QUERY_PREFIX = "search_query: "
+EMBED_CHARS = int(os.environ.get("CARTOGRAPH_EMBED_CHARS", "600"))
 _MODEL = None
 _FILES = ("vectors.npy", "chunk_ids.npy", "project_ids.npy")
 
@@ -386,7 +387,7 @@ def _build_index(store: Store, cfg: Config, *, batch: int | None = None, progres
         ph = ",".join("?" * len(want))
         with store.cursor() as c:
             text = {r[0]: r[1] for r in c.execute(f"SELECT id, chunk_text FROM chunks WHERE id IN ({ph})", want)}
-        texts = [DOC_PREFIX + (text.get(k) or "")[:600] for k in want]
+        texts = [DOC_PREFIX + (text.get(k) or "")[:EMBED_CHARS] for k in want]
         emb = model.encode(texts, normalize_embeddings=True, batch_size=batch)
         vecs[sel] = emb.astype("float16")
         done[sel] = True
@@ -516,10 +517,32 @@ class SemanticIndex:
         order = np.argsort(-sims)[:fetch]
         return idx[order], sims[order]
 
+    def _qv(self, query: str):
+        import numpy as np
+        last = getattr(self, "_last_q", None)
+        if last is None or last[0] != query:
+            qv = _model(self.cfg.embed_model).encode([QUERY_PREFIX + query], normalize_embeddings=True)[0]
+            self._last_q = last = (query, np.asarray(qv, dtype=np.float32))
+        return last[1]
+
+    def search_in_projects(self, query: str, project_ids: list[int], top_k: int = 30) -> list[int]:
+        """Exact search restricted to the given projects (for queries that name a project)."""
+        import numpy as np
+        try:
+            rows = np.flatnonzero(np.isin(self.project_ids, project_ids))
+            if not len(rows):
+                return []
+            sims = np.asarray(self.vectors[rows], dtype=np.float32) @ self._qv(query)
+            if self.building:
+                rows, sims = rows[sims > 0], sims[sims > 0]
+            order = np.argsort(-sims)[:top_k]
+        except Exception:
+            return []
+        return [int(self.chunk_ids[rows[i]]) for i in order]
+
     def _ranked(self, query: str, fetch: int):
         import numpy as np
-        qv = _model(self.cfg.embed_model).encode([QUERY_PREFIX + query], normalize_embeddings=True)[0]
-        qv = np.asarray(qv, dtype=np.float32)
+        qv = self._qv(query)
         fetch = min(fetch, self.vectors.shape[0])
         self._load_ann()
         if self.ann is not None:
