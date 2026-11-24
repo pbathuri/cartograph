@@ -2,7 +2,7 @@
 
 All notable changes to Cartograph (`cartograph__v1`) are documented here. Versioning is semantic.
 
-## [Unreleased]
+## [2.0.3] — 2026-11-23
 
 Found by auditing a real 7.1M-chunk, 604k-file graph with a 30-question workflow eval. The eval
 ships as `scripts/workflow_eval.py` (with an example question file) so anyone can score Cartograph on
