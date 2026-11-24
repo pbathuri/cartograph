@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 # PyPI distribution name (the import module stays `cartograph` and the CLI stays `carto`).
 name = "cartograph__v1"
-version = "2.0.2"
+version = "2.0.3"
 description = "Local knowledge graph + shared memory for AI agents: PDFs, Office, notebooks and code with page/line citations, over MCP."
 readme = "README.md"
 license = { text = "MIT" }
