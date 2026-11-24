@@ -66,6 +66,7 @@ class IngestStats:
     docs_unsupported: int = 0     # PDFs seen but skipped because no PDF backend is installed
     facts: int = 0                # entity facts (re)extracted from changed files
     links: int = 0                # project links from shared entities after this run
+    files_pruned: int = 0         # stored files gone from disk or no longer part of their project
     fields: dict[str, int] = field(default_factory=dict)
 
 
@@ -248,12 +249,15 @@ def discover_projects(root: Path, cfg: Config, *, max_depth: int = MAX_PROJECT_D
             return True
         return d.name.lower() in names and len(_subdirs(d, cfg.ignore)) >= 2
 
+    def has_loose_files(d: Path) -> bool:
+        return any(p.is_file() and (p.suffix.lower() in TEXT_EXT or p.suffix.lower() in DOC_EXT)
+                   for p in d.iterdir())
+
     def walk(d: Path, depth: int) -> list[tuple[Path, bool]]:
         if depth >= max_depth or not is_container(d, max_depth - depth):
             return [(d, True)]
         out: list[tuple[Path, bool]] = []
-        if any(p.is_file() and (p.suffix.lower() in TEXT_EXT or p.suffix.lower() in DOC_EXT)
-               for p in d.iterdir()):
+        if has_loose_files(d):
             out.append((d, False))
         for k in _subdirs(d, cfg.ignore):
             out.extend(walk(k, depth + 1))
@@ -264,7 +268,7 @@ def discover_projects(root: Path, cfg: Config, *, max_depth: int = MAX_PROJECT_D
     subdirs = _subdirs(root, cfg.ignore)
     if len(subdirs) < 2:
         return [(root, True)]
-    found: list[tuple[Path, bool]] = []
+    found: list[tuple[Path, bool]] = [(root, False)] if has_loose_files(root) else []
     for d in subdirs:
         found.extend(walk(d, 1))
     return found
@@ -303,6 +307,9 @@ def ingest_path(root: str | Path, store: Store, cfg: Config, *, progress=None, p
                 files.append(p)
             elif p.suffix.lower() == ".pdf":
                 st.docs_unsupported += 1
+        old = store.project_id_at(project_name(root, proj), str(proj))
+        if old is not None:
+            st.files_pruned += store.prune_files(old, {str(p) for p in files})
         if not files:
             continue
         text_files = [p for p in files if p.suffix.lower() not in DOC_EXT]

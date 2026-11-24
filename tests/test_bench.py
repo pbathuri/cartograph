@@ -67,4 +67,6 @@ def test_run_merges_suites_and_renders_markdown(monkeypatch):
 def test_sanitize_keeps_identifiers_as_phrases():
     q = sanitize("residence time of KX-417 vs torch.nn")
     assert '"KX 417"' in q and '"torch nn"' in q and '"residence"' in q
-    assert sanitize("plain words only") == '"plain" OR "words" OR "only"'
+    assert sanitize("plain words only") == '"plain" OR "words"'
+    assert sanitize("how do I size positions with volatility") == '"size" OR "positions" OR "volatility"'
+    assert sanitize("what is it") == '"what" OR "is" OR "it"'      # all stopwords: keep them

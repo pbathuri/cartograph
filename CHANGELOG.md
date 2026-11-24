@@ -4,6 +4,32 @@ All notable changes to Cartograph (`cartograph__v1`) are documented here. Versio
 
 ## [Unreleased]
 
+Found by auditing a real 7.1M-chunk, 604k-file graph with a 30-question workflow eval. The eval
+ships as `scripts/workflow_eval.py` (with an example question file) so anyone can score Cartograph on
+their own files against ripgrep; the README has the results.
+
+- **Re-ingest removes files that are gone.** Ingest never deleted a file row: deleted files kept being
+  cited, and when a folder ingested as one project was later split into its repos, every file stayed in
+  both. On the audited graph that was 233,386 files and 2.3M chunks (a third of the index) stored twice,
+  so most results came back in pairs. Files deleted from disk, newly ignored, or moved into a sub-project
+  are now pruned (`removed N file(s)` in the ingest summary). Unmounted drives are still left alone.
+- **Files at the top of a root folder are ingested.** When a root held several projects, its own loose
+  files (a manuscript, meeting notes) were skipped. On the audited machine that was 979 files.
+- **Keyword search is about 10x faster on large graphs.** Question words (how, do, with, where...) no longer
+  become search terms, and BM25 ranks inside the FTS table before joining. On the 7.1M-chunk graph median
+  keyword latency fell from 1.8 s to 0.16 s and hybrid `retrieve_context` from 1.9 s to 0.4 s; SciFact nDCG@10 rose (keyword 0.655 -> 0.658,
+  hybrid 0.709 -> 0.714).
+- **Naming a project finds its code.** "Where is causal self-attention defined in nanoGPT" now searches
+  inside nanoGPT too (with double weight in the fusion), because a repo's own files rarely mention its name.
+- **The same passage is never returned twice.** Identical text from a second checkout or copy of a file
+  collapses to its best-ranked citation.
+- **Mixed answers skip off-topic session logs.** Auto-captured session notes are long enough to match any
+  single word, so they crowded `mode: mix` answers. They now need half the query's keywords; decisions,
+  rejections, preferences and facts still need only one.
+- **No 10-second first call.** `carto mcp-server` loads the embedding model and index on a background
+  thread at start (`CARTOGRAPH_MCP_WARM=0` turns this off).
+- `CARTOGRAPH_EMBED_CHARS` sets how much of each chunk is embedded (default 600). 1200 scores SciFact
+  hybrid nDCG@10 0.723 instead of 0.714, at about twice the embedding time.
 - **Index builds can no longer destroy each other.** A second builder (e.g. the nightly `carto improve`
   starting while `carto index` runs) used to delete the first one's folder and start over, while the
   first kept writing into the deleted file. Builds now take a single-builder lock; `improve` skips its

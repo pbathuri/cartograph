@@ -336,9 +336,21 @@ def _run(rid: Any, name: str, args: dict) -> str:
     return _resp(rid, error=f"unhandled: {name}")
 
 
+def _warm() -> None:
+    """Load the embedding model and vector index before the first tool call asks for them (8-10 s cold)."""
+    try:
+        from .retrieve import _semantic_chunk_ids
+        _semantic_chunk_ids(load_config(), "warm up", 1)
+    except Exception:
+        pass
+
+
 def serve(read_only_mode: bool = False) -> None:
     if read_only_mode:
         os.environ["CARTOGRAPH_MCP_READ_ONLY"] = "1"
+    if os.environ.get("CARTOGRAPH_MCP_WARM", "1") != "0":
+        import threading
+        threading.Thread(target=_warm, daemon=True).start()
     for line in sys.stdin:
         line = line.strip()
         if not line:

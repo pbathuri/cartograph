@@ -172,6 +172,26 @@ class Store:
                 "JOIN files f ON f.id = ch.file_id WHERE f.project_id=? ORDER BY ch.id DESC LIMIT ?",
                 (project_id, limit)).fetchall()]
 
+    def project_id_at(self, name: str, path: str) -> int | None:
+        with self.cursor() as c:
+            row = c.execute("SELECT id FROM projects WHERE name=? AND path=?", (name, path)).fetchone()
+        return row[0] if row else None
+
+    def prune_files(self, project_id: int, keep_paths: set[str]) -> int:
+        """Delete a project's ingested files that are not in `keep_paths` (deleted from disk, now ignored,
+        or now part of a sub-project), with their chunks and mentions. Screen-capture files are kept."""
+        with self.cursor() as c:
+            rows = c.execute("SELECT id, path FROM files WHERE project_id=? AND ext != 'screen'",
+                             (project_id,)).fetchall()
+            stale = [r["id"] for r in rows if r["path"] not in keep_paths]
+            for i in range(0, len(stale), 500):
+                ids = stale[i:i + 500]
+                ph = ",".join("?" * len(ids))
+                c.execute(f"DELETE FROM chunks WHERE file_id IN ({ph})", ids)
+                c.execute(f"DELETE FROM mentions WHERE file_id IN ({ph})", ids)
+                c.execute(f"DELETE FROM files WHERE id IN ({ph})", ids)
+        return len(stale)
+
     def delete_project(self, project_id: int) -> None:
         """Remove a project with its files, chunks (FTS rows follow via trigger) and edges."""
         with self.cursor() as c:
@@ -259,18 +279,20 @@ class Store:
 
     # ---- reads ----
     def search_chunks(self, fts_query: str, limit: int = 20, project_id: int | None = None) -> list[dict]:
-        base = (
-            f"SELECT ch.id AS chunk_id, ch.chunk_text, {self.locator_sql()} AS locator, f.path AS file_path, "
-            "p.name AS project_name, p.id AS project_id, chunks_fts.rank AS score FROM chunks_fts "
-            "JOIN chunks ch ON ch.id = chunks_fts.rowid JOIN files f ON f.id = ch.file_id "
-            "LEFT JOIN projects p ON p.id = f.project_id WHERE chunks_fts MATCH ?"
-        )
-        params: list[Any] = [fts_query]
-        if project_id is not None:
-            base += " AND p.id = ?"
-            params.append(project_id)
-        base += " ORDER BY chunks_fts.rank LIMIT ?"
-        params.append(limit)
+        cols = (f"SELECT ch.id AS chunk_id, ch.chunk_text, {self.locator_sql()} AS locator, f.path AS file_path, "
+                "p.name AS project_name, p.id AS project_id, hit.score AS score FROM ")
+        joins = ("JOIN chunks ch ON ch.id = hit.rowid JOIN files f ON f.id = ch.file_id "
+                 "LEFT JOIN projects p ON p.id = f.project_id ")
+        if project_id is None:
+            # Rank inside the FTS table first: joining before ORDER BY rank makes SQLite join every match.
+            base = (cols + "(SELECT rowid, rank AS score FROM chunks_fts WHERE chunks_fts MATCH ? "
+                    "ORDER BY rank LIMIT ?) hit " + joins + "ORDER BY hit.score")
+            params: list[Any] = [fts_query, limit]
+        else:
+            base = (cols + "(SELECT rowid, rank AS score FROM chunks_fts WHERE chunks_fts MATCH ? AND rowid IN "
+                    "(SELECT c2.id FROM chunks c2 JOIN files f2 ON f2.id = c2.file_id WHERE f2.project_id = ?) "
+                    "ORDER BY rank LIMIT ?) hit " + joins + "ORDER BY hit.score")
+            params = [fts_query, project_id, limit]
         with self.cursor() as c:
             return [dict(r) for r in c.execute(base, params).fetchall()]
 

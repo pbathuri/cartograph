@@ -1,0 +1,8 @@
+{"q": "where is the causal self-attention module defined in nanoGPT", "accept": ["nanoGPT/model.py"], "source": "nanoGPT"}
+{"q": "how does requests mount a transport adapter with connection pooling and retries", "accept": ["requests/adapters.py"], "source": "requests"}
+{"q": "register a group of routes under a common URL prefix in Flask", "accept": ["flask/blueprints.py", "flask/sansio/blueprints.py"], "source": "flask"}
+{"q": "Sharpe and Sortino ratio of a returns series", "accept": ["quantstats/stats.py"], "source": "quantstats"}
+{"q": "benchmark several GPU kernel configurations and keep the fastest", "accept": ["triton/runtime/autotuner.py"], "source": "triton"}
+{"q": "histogram-based gradient boosting tree splitter", "accept": ["_hist_gradient_boosting/"], "source": "scikit-learn"}
+{"q": "scale position size so the portfolio hits a target annual volatility", "accept": ["systems/positionsizing.py"], "source": "pysystemtrade"}
+{"q": "trap keyboard focus inside a modal dialog", "accept": ["focus-scope"], "source": "primitives"}

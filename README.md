@@ -31,8 +31,11 @@ memory of what you decided.
 
 - **Cited, not guessed.** In our benchmark the top result cites the exact page, slide or line 99.2% of
   the time, so your agent can quote `paper.pdf p.12` and you can check it.
+- **Finds what grep can't.** On 30 real questions about a 373,000-file library, the right file was in the
+  top 5 for 50% of them (ripgrep: 23%) and the right repo or document for 80%, in 0.18 s instead of
+  14.6 s, as 1,800 cited tokens instead of a 50,000-file match list. [Details](#on-a-real-library).
 - **All your files, not just code.** PDF, Word, PowerPoint, Excel, EPUB, notebooks, LaTeX, BibTeX and 70
-  code, data and config formats. Run daily on a 535,000-file, 6.5-million-chunk library.
+  code, data and config formats. Run daily on a 373,000-file, 5-million-chunk library.
 - **One memory for every agent.** A decision saved in Claude Code is there in Cursor's next session.
   When the files a memory points at change, it's flagged as possibly stale.
 - **Local and light.** One SQLite file, a 43 MB install, no LLM calls to index, no server, no account.
@@ -45,8 +48,8 @@ memory of what you decided.
   files across many projects, searched with citations, and shared by every client. Use both.
 - **grep** can't read PDFs, Word or slides, doesn't rank, and has no budget. Across hundreds of thousands
   of files an agent spends its context just finding one thing. `retrieve_context` returns ranked, cited
-  passages under a hard `max_tokens` cap. Keyword search answers in 30 to 230 ms on a 6.5-million-chunk
-  library.
+  passages under a hard `max_tokens` cap. On a 5-million-chunk library a hybrid query takes 0.18 s
+  (median); ripgrep over the same folders takes 14.6 s and matches a median of 50,000 files.
 - **Do I need a GPU, an API key or Docker?** No. Keyword search works the moment `carto ingest`
   finishes. Semantic search is optional and runs locally.
 
@@ -132,17 +135,39 @@ touches your graph.
 
 | Suite | Mode | Quality | Latency p50 / p95 |
 |---|---|---|---|
-| BEIR SciFact (300 queries, 5,183 abstracts) | keyword | nDCG@10 **0.655** · R@100 0.873 · MRR@10 0.622 | 23 / 41 ms |
-| BEIR SciFact | hybrid (nomic-embed v1.5) | nDCG@10 **0.709** · R@100 0.938 · MRR@10 0.673 | 70 / 135 ms |
-| Citations (240 planted facts in PDF, DOCX, PPTX, MD and PY) | keyword | exact citation@1 **0.992** · hit@5 1.000 | 3 / 7 ms |
+| BEIR SciFact (300 queries, 5,183 abstracts) | keyword | nDCG@10 **0.658** · R@100 0.883 · MRR@10 0.625 | 5 / 8 ms |
+| BEIR SciFact | hybrid (nomic-embed v1.5) | nDCG@10 **0.714** · R@100 0.948 · MRR@10 0.676 | 23 / 38 ms |
+| Citations (240 planted facts in PDF, DOCX, PPTX, MD and PY) | keyword | exact citation@1 **0.992** · hit@5 1.000 | 1 / 2 ms |
 
 For reference, BEIR reports BM25 at 0.665 nDCG@10 on SciFact. The citation suite checks that the top
 result is the right file *and* that its citation points at the right page, slide or line. That's what
 you need before you trust an answer, and most RAG benchmarks don't measure it.
 
-At scale, on a real 6.5M-chunk, 535k-file graph on an M-series Mac: approximate semantic search takes
+At scale, on a real 6.5M-vector index on an M-series Mac: approximate semantic search takes
 **7 ms p50 / 11 ms p95** (brute force: 8–10 s) with tie-aware recall@10 of 0.99. Extracting entities
 from all 6.5M chunks takes about 15 minutes.
+
+### On a real library
+
+Public benchmarks don't tell you whether your agent finds *your* files. So we wrote 30 questions about
+the author's own library (373k files, 5.0M chunks: research papers and manuscripts as PDF and Word, lab
+code, and 57 cloned reference repos), phrased the way you'd ask them, without file names. Each one has a
+known right file. Then we scored exactly what `retrieve_context` returns, and ripgrep over the same folders
+for comparison. To be generous to grep, its matches were ranked by how many of the question's keywords
+each file contains.
+
+| | Right file 1st | Right file in top 5 | Right repo or doc in top 5 | Median time | What the agent reads |
+|---|---|---|---|---|---|
+| **Cartograph (hybrid)** | **27%** | **50%** | **80%** | **0.18 s** | ~1,800 tokens, every passage cited |
+| Cartograph (keyword only) | 30% | 60% | 83% | 0.14 s | ~1,800 tokens |
+| ripgrep, ranked | 10% | 23% | — | 14.6 s | a 50,000-file match list (13M tokens of output) |
+
+Questions about papers did best: the right PDF came first for 4 of 5 and was in the top 5 for all 5.
+ripgrep can't read PDF or Word, so it found none of them. Conceptual questions about large code repos
+are the weak spot: the right repo was in the top 5 for 16 of 17, the exact source file for 7 of 17
+(see [Limits](#limits)). This is one author's library and one author's questions, so
+treat it as a measurement you can repeat, not a leaderboard. Run it on your own files:
+`python scripts/workflow_eval.py questions.jsonl --grep` ([format](examples/workflow_questions.jsonl)).
 
 ## How it compares
 
@@ -226,6 +251,13 @@ An interactive map of your graph that works offline: no CDN, no tracking.
 - The graph is built from structure, not from an LLM reading your prose: dependencies, imports, papers
   (DOI, arXiv), repos, models, datasets and the links they imply. If you need open-ended relations
   extracted from text, an LLM-built graph (GraphRAG, Graphiti, Cognee) does that, at a cost.
+- Conceptual questions about big code repos are the weakest case. Ask "where does pysystemtrade scale
+  positions to a volatility target" (naming the repo searches inside it), not just "how do I size positions".
+  On a library with 57 large cloned repos, the right repo was in the top 5 for 16 of 17 such questions,
+  the exact source file for 7 of 17.
+- Embeddings cover the first 600 characters of each ~1,200-character chunk, to keep laptop indexing
+  fast. `CARTOGRAPH_EMBED_CHARS=1200 carto index --full` embeds whole chunks: SciFact nDCG@10 0.723 instead
+  of 0.714, at about twice the indexing time. On code-heavy libraries keyword search alone can rank as well as hybrid.
 - Scanned PDFs need OCR: install PyMuPDF and Tesseract and set `ocr: true`.
 - Embedding millions of chunks takes hours on a laptop. Keyword search works immediately, and you can
   search while the semantic index builds.

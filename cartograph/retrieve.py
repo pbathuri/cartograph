@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -21,13 +22,31 @@ _FTS_BAD = re.compile(r"[^\w\s]")
 
 _COMPOUND = re.compile(r"\b\w+(?:[-./:]\w+)+\b")
 
+# Question words and glue. Each one matches millions of chunks: on a 7M-chunk graph they made keyword
+# search 2-5x slower while adding nothing to the ranking.
+STOPWORDS = frozenset("""
+a about above after again all also am an and any are as at be because been before being below between both
+but by can could did do does doing done down during each else few for from further get gets got had has have
+having he her here hers him his how i if in into is it its itself just me more most my myself no nor not now
+of off on once only or other our ours out over own same she should so some such than that the their theirs
+them then there these they this those through to too under until up very was we were what when where which
+while who whom why will with would you your yours yourself
+""".split())
+
+
+def keywords(q: str) -> list[str]:
+    """The query's searchable words: punctuation stripped, stopwords dropped (all kept if that empties it)."""
+    toks = [t for t in _FTS_BAD.sub(" ", q).split() if len(t) >= 2]
+    kept = [t for t in toks if t.lower() not in STOPWORDS]
+    return kept or toks
+
 
 def sanitize(q: str) -> str:
-    """FTS5 query: every word as an OR term, plus identifiers like IL-6, KX-417, CVE-2024-1234 or
+    """FTS5 query: every keyword as an OR term, plus identifiers like IL-6, KX-417, CVE-2024-1234 or
     torch.nn as exact phrases, so their pieces matching elsewhere don't outrank the real thing."""
-    toks = [t for t in _FTS_BAD.sub(" ", q).split() if len(t) >= 2]
+    toks = keywords(q)
     phrases = [" ".join(_FTS_BAD.sub(" ", m).split()) for m in _COMPOUND.findall(q)]
-    terms = [f'"{t}"' for t in toks] + [f'"{p}"' for p in dict.fromkeys(phrases) if " " in p]
+    terms = [f'"{t}"' for t in dict.fromkeys(toks)] + [f'"{p}"' for p in dict.fromkeys(phrases) if " " in p]
     return " OR ".join(terms)
 
 
@@ -52,6 +71,7 @@ class RetrieveResult:
 
 
 _INDEX = None
+_INDEX_LOCK = threading.Lock()
 
 
 def _semantic_chunk_ids(cfg: Config, query: str, top_k: int) -> list[int]:
@@ -60,11 +80,47 @@ def _semantic_chunk_ids(cfg: Config, query: str, top_k: int) -> list[int]:
     if not (SemanticIndex.exists() and available_semantic()):
         return []
     try:
-        if _INDEX is None or _INDEX.signature != SemanticIndex.current_signature():
-            _INDEX = SemanticIndex(cfg)
-        return _INDEX.search_chunk_ids(query, top_k=top_k)
+        with _INDEX_LOCK:                    # the MCP server warms this up on a thread at start
+            if _INDEX is None or _INDEX.signature != SemanticIndex.current_signature():
+                _INDEX = SemanticIndex(cfg)
+            return _INDEX.search_chunk_ids(query, top_k=top_k)
     except Exception:
         return []
+
+
+def _semantic_in_projects(cfg: Config, query: str, project_ids: list[int], top_k: int) -> list[int]:
+    if not _semantic_chunk_ids(cfg, query, 1):                # loads (or reloads) the index
+        return []
+    with _INDEX_LOCK:
+        return _INDEX.search_in_projects(query, project_ids, top_k=top_k)
+
+
+def _short_name(project: str) -> str | None:
+    """The word that names a project, if its folder name looks like a name and not a plain word:
+    a GitHub-style 'owner__repo' clone ('pallets__flask' -> 'flask') or a name with inner capitals or
+    digits ('nanoGPT', 'Kronos2'). Plain folders like 'Notes', 'outputs' or 'data' name nothing."""
+    leaf = project.rsplit("/", 1)[-1]
+    owner, sep, repo = leaf.partition("__")
+    short = repo if sep and owner else leaf
+    if not (sep and owner) and not re.search(r".[A-Z]|\d", short):
+        return None
+    short = short.lower()
+    if len(short) < 4 or short in STOPWORDS or short in _STOP:
+        return None
+    return short
+
+
+def named_projects(store: Store, query: str) -> dict[int, str]:
+    """Projects the query names ("... in nanoGPT", "how does requests ..."): id -> the word that named it."""
+    words = {w.lower() for w in keywords(query)}
+    with store.cursor() as c:
+        rows = c.execute("SELECT id, name FROM projects").fetchall()
+    out = {}
+    for pid, name in rows:
+        short = _short_name(name or "")
+        if short and short in words:
+            out[pid] = short
+    return dict(list(out.items())[:3])
 
 
 def available_semantic() -> bool:
@@ -84,6 +140,9 @@ def _chunks_by_id(store: Store, ids: list[int]) -> dict[int, dict]:
         return {int(dict(r)["chunk_id"]): dict(r) for r in c.execute(sql, ids).fetchall()}
 
 
+NAMED_WEIGHT = 2.0          # RRF weight of the list searched inside a project the query names
+
+
 def retrieve(query: str, store: Store, cfg: Config, *, top_k: int = 10, rrf_k: int | None = None) -> RetrieveResult:
     """Hybrid chunk retrieval (RRF of semantic + FTS), collapsed to ranked projects + the snippets.
     `rrf_k` defaults to the tuned value (`carto improve`), else 60."""
@@ -93,19 +152,40 @@ def retrieve(query: str, store: Store, cfg: Config, *, top_k: int = 10, rrf_k: i
     san = sanitize(query)
     fts_rows = store.search_chunks(san, limit=top_k * 3) if san else []
     sem_ids = _semantic_chunk_ids(cfg, query, top_k * 3)
-    sem_rows = _chunks_by_id(store, sem_ids)
+    rankings = [sem_ids, [r["chunk_id"] for r in fts_rows]]
+    weights = [1.0, 1.0]
+    named = named_projects(store, query)
+    if named:
+        # The project's own files rarely contain its name, so search inside it as well. The vector
+        # search is fast; keyword search inside one project scores every match in the graph, so it only
+        # runs when there is no vector index.
+        inside_ids = _semantic_in_projects(cfg, query, list(named), top_k * 3) if sem_ids else []
+        if not sem_ids:
+            rest = sanitize(" ".join(w for w in keywords(query) if w.lower() not in set(named.values())) or query)
+            inside = [r for pid in named for r in store.search_chunks(rest, limit=top_k * 3, project_id=pid)] if rest else []
+            fts_rows += inside
+            inside_ids = [r["chunk_id"] for r in inside]
+        rankings.append(inside_ids)
+        weights.append(NAMED_WEIGHT)
+    sem_rows = _chunks_by_id(store, sem_ids + (rankings[2] if len(rankings) > 2 and sem_ids else []))
     pool = {r["chunk_id"]: r for r in fts_rows}
     pool.update(sem_rows)
     # fused RRF scores (kept, not just the order) so downstream can measure relevance MARGIN/ambiguity.
     fscore: dict[Any, float] = {}
-    for ranking in (sem_ids, [r["chunk_id"] for r in fts_rows]):
+    for ranking, w in zip(rankings, weights):
         for rank, key in enumerate(ranking, 1):
             if key is not None:
-                fscore[key] = fscore.get(key, 0.0) + 1.0 / (rrf_k + rank)
-    fused = [k for k, _ in sorted(fscore.items(), key=lambda t: t[1], reverse=True)][:top_k]
-    chunks = []
+                fscore[key] = fscore.get(key, 0.0) + w / (rrf_k + rank)
+    fused = [k for k, _ in sorted(fscore.items(), key=lambda t: t[1], reverse=True)]
+    chunks, seen = [], set()
     for i in fused:
+        if len(chunks) >= top_k:
+            break
         if i in pool:
+            body = " ".join((pool[i].get("chunk_text") or "").split())
+            if body in seen:                 # the same passage in a second checkout or copy of a file
+                continue
+            seen.add(body)
             ch = dict(pool[i])
             ch["score"] = round(fscore.get(i, 0.0), 6)       # fused relevance score
             if not ch.get("locator"):
@@ -158,6 +238,18 @@ def _dedupe(chunks: list[dict], threshold: float = 0.6) -> list[dict]:
     return out
 
 
+def _on_topic(query: str, text: str, kind: str) -> bool:
+    """Whether a memory belongs in a mixed answer. Curated memories (decisions, rejections...) need one
+    shared keyword; auto-captured session logs need half the query's keywords, because a long session
+    log contains nearly any single word."""
+    words = {w.lower() for w in keywords(query) if w.lower() not in _STOP}
+    if not words:
+        return True
+    have = {w[:6] for w in re.findall(r"\w{2,}", text.lower())}
+    shared = sum(w[:6] in have for w in words)
+    return shared >= len(words) / 2 if kind == "session" else shared >= 1
+
+
 def _graph_facts(store: Store, query: str, limit: int) -> list[dict]:
     from . import entities as E
     terms = [t for t in re.findall(r"[\w.\-/]{3,}", query.lower()) if t not in _STOP]
@@ -192,7 +284,7 @@ def context(query: str, store: Store, cfg: Config, *, mode: str = "mix", max_tok
         if not mem["memories"] and (project or cwd):
             mem = M.recall(store, query, limit=12, max_chars=share)
         items = [{k: m[k] for k in ("id", "kind", "text", "project", "created", "stale") if m.get(k)}
-                 for m in mem["memories"]]
+                 for m in mem["memories"] if mode == "memory" or _on_topic(query, m["text"], m["kind"])]
         out["memories"] = items
         used += sum(len(m["text"]) + 40 for m in items)
 
